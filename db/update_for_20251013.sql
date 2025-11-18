@@ -1,0 +1,2 @@
+ALTER TABLE `mt_coupon`
+  ADD COLUMN `CONTENT` INT DEFAULT 1 NULL COMMENT '内容，如：1表示满减券、2表示折扣券' AFTER `TYPE`;

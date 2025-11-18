@@ -1,0 +1,2 @@
+ALTER TABLE `mt_goods`
+  ADD COLUMN `PLATFORM` INT (1) DEFAULT 0 NULL COMMENT '可用平台，0：不限，1：仅会员端（小程序和h5）；2：仅收银端' AFTER `GOODS_NO`;

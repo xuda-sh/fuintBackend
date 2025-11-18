@@ -1,0 +1,14 @@
+ALTER TABLE `fuint-db`.`mt_cart`
+  CHANGE `NUM` `NUM` DOUBLE (10, 2) DEFAULT 1 NULL COMMENT '数量';
+
+ALTER TABLE `fuint-db`.`mt_goods`
+  CHANGE `STOCK` `STOCK` DOUBLE (10, 2) UNSIGNED DEFAULT 0 NULL COMMENT '库存';
+
+ALTER TABLE `fuint-db`.`mt_goods`
+  CHANGE `INIT_SALE` `INIT_SALE` DOUBLE (10, 2) DEFAULT 0 NULL COMMENT '初始销量';
+
+ALTER TABLE `fuint-db`.`mt_goods_sku`
+  CHANGE `STOCK` `STOCK` DOUBLE (10, 2) DEFAULT 0 NOT NULL COMMENT '库存';
+
+ALTER TABLE `fuint-db`.`mt_order_goods`
+  CHANGE `NUM` `NUM` DOUBLE (10, 2) DEFAULT 0 NOT NULL COMMENT '商品数量';
