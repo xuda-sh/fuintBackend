@@ -3,28 +3,30 @@ package com.fuint.common.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fuint.common.dto.CommissionRelationDto;
+import com.fuint.common.dto.commission.CommissionRelationDto;
+import com.fuint.common.enums.StatusEnum;
+import com.fuint.common.param.CommissionRelationPage;
 import com.fuint.common.service.CommissionRelationService;
 import com.fuint.common.service.MemberService;
 import com.fuint.common.service.MerchantService;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.mapper.MtCommissionRelationMapper;
-import com.fuint.common.enums.StatusEnum;
 import com.fuint.repository.model.MtCommissionRelation;
 import com.fuint.repository.model.MtUser;
 import com.fuint.utils.StringUtil;
+import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import lombok.AllArgsConstructor;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.github.pagehelper.Page;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+
 import java.util.*;
 
 /**
@@ -34,7 +36,7 @@ import java.util.*;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class CommissionRelationServiceImpl extends ServiceImpl<MtCommissionRelationMapper, MtCommissionRelation> implements CommissionRelationService {
 
     private static final Logger logger = LoggerFactory.getLogger(CommissionRelationServiceImpl.class);
@@ -54,37 +56,39 @@ public class CommissionRelationServiceImpl extends ServiceImpl<MtCommissionRelat
     /**
      * 分页查询关系列表
      *
-     * @param paginationRequest
+     * @param commissionRelationPage
      * @return
      */
     @Override
-    public PaginationResponse<CommissionRelationDto> queryRelationByPagination(PaginationRequest paginationRequest) throws BusinessCheckException {
-        Page<MtCommissionRelation> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<CommissionRelationDto> queryRelationByPagination(CommissionRelationPage commissionRelationPage) {
+        Page<MtCommissionRelation> pageHelper = PageHelper.startPage(commissionRelationPage.getPage(), commissionRelationPage.getPageSize());
         LambdaQueryWrapper<MtCommissionRelation> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtCommissionRelation::getStatus, StatusEnum.DISABLE.getKey());
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = commissionRelationPage.getStatus();
         if (StringUtils.isNotBlank(status)) {
             lambdaQueryWrapper.eq(MtCommissionRelation::getStatus, status);
         }
-        String userId = paginationRequest.getSearchParams().get("userId") == null ? "" : paginationRequest.getSearchParams().get("userId").toString();
-        if (StringUtils.isNotBlank(userId)) {
+        Integer userId = commissionRelationPage.getUserId();
+        if (userId != null && userId > 0) {
             lambdaQueryWrapper.eq(MtCommissionRelation::getUserId, userId);
         }
-        String subUserId = paginationRequest.getSearchParams().get("subUserId") == null ? "" : paginationRequest.getSearchParams().get("subUserId").toString();
+        String subUserId = commissionRelationPage.getSubUserId();
         if (StringUtils.isNotBlank(subUserId)) {
             lambdaQueryWrapper.eq(MtCommissionRelation::getSubUserId, subUserId);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-
-        String merchantNo = paginationRequest.getSearchParams().get("merchantNo") == null ? "" : paginationRequest.getSearchParams().get("merchantNo").toString();
-        if (StringUtils.isNotBlank(merchantNo) && StringUtil.isEmpty(merchantId)) {
+        Integer level = commissionRelationPage.getLevel();
+        if (level != null && level > 0) {
+            lambdaQueryWrapper.eq(MtCommissionRelation::getLevel, level);
+        }
+        Integer merchantId = commissionRelationPage.getMerchantId();
+        String merchantNo = commissionRelationPage.getMerchantNo();
+        if (StringUtils.isNotBlank(merchantNo) && (merchantId == null || merchantId <= 0)) {
             Integer mchId = merchantService.getMerchantId(merchantNo);
             if (mchId != null && mchId > 0) {
-                merchantId = mchId.toString();
+                merchantId = mchId;
             }
         }
-
-        if (StringUtils.isNotBlank(merchantId)) {
+        if (merchantId != null && merchantId > 0) {
             lambdaQueryWrapper.eq(MtCommissionRelation::getMerchantId, merchantId);
         }
 
@@ -104,7 +108,8 @@ public class CommissionRelationServiceImpl extends ServiceImpl<MtCommissionRelat
                  }
             }
         }
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+
+        PageRequest pageRequest = PageRequest.of(commissionRelationPage.getPage(), commissionRelationPage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<CommissionRelationDto> paginationResponse = new PaginationResponse(pageImpl, CommissionRelationDto.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -119,11 +124,10 @@ public class CommissionRelationServiceImpl extends ServiceImpl<MtCommissionRelat
      *
      * @param userInfo 会员信息
      * @param shareId 分享者ID
-     * @throws BusinessCheckException
      * @retrurn
      */
     @Override
-    public void setCommissionRelation(MtUser userInfo, String shareId) throws BusinessCheckException {
+    public void setCommissionRelation(MtUser userInfo, String shareId) {
         if (userInfo == null || StringUtil.isBlank(shareId) || Integer.parseInt(shareId) <= 0) {
             return;
         }
@@ -138,7 +142,7 @@ public class CommissionRelationServiceImpl extends ServiceImpl<MtCommissionRelat
         param.put("SUB_USER_ID", userInfo.getId());
         param.put("STATUS", StatusEnum.ENABLED.getKey());
         List<MtCommissionRelation> dataList = mtCommissionRelationMapper.selectByMap(param);
-        if (dataList == null || dataList.size() <= 0) {
+        if (dataList == null || dataList.size() == 0) {
             MtCommissionRelation mtCommissionRelation = new MtCommissionRelation();
             mtCommissionRelation.setCreateTime(new Date());
             mtCommissionRelation.setUpdateTime(new Date());
@@ -168,7 +172,6 @@ public class CommissionRelationServiceImpl extends ServiceImpl<MtCommissionRelat
             mtCommissionRelation.setLevel(2);
             mtCommissionRelationMapper.insert(mtCommissionRelation);
         }
-
-        return;
+        logger.info("记录分佣关系成功，shareId = {}, userId = {}", shareId, userInfo.getId());
     }
 }

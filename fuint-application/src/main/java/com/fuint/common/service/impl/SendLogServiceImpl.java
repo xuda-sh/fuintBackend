@@ -3,11 +3,10 @@ package com.fuint.common.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fuint.common.dto.ReqSendLogDto;
+import com.fuint.common.dto.coupon.ReqSendLogDto;
 import com.fuint.common.enums.StatusEnum;
+import com.fuint.common.param.SendLogPage;
 import com.fuint.common.service.SendLogService;
-import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.mapper.MtSendLogMapper;
 import com.fuint.repository.model.MtSendLog;
@@ -15,9 +14,11 @@ import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import lombok.AllArgsConstructor;
 import org.apache.commons.lang.StringUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+
 import java.util.Date;
 import java.util.List;
 
@@ -28,7 +29,7 @@ import java.util.List;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class SendLogServiceImpl extends ServiceImpl<MtSendLogMapper, MtSendLog> implements SendLogService {
 
     private MtSendLogMapper mtSendLogMapper;
@@ -36,36 +37,36 @@ public class SendLogServiceImpl extends ServiceImpl<MtSendLogMapper, MtSendLog> 
     /**
      * 分页查询列表
      *
-     * @param paginationRequest
+     * @param sendLogPage
      * @return
      */
     @Override
-    public PaginationResponse<MtSendLog> querySendLogListByPagination(PaginationRequest paginationRequest) {
-        Page<MtSendLog> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<MtSendLog> querySendLogListByPagination(SendLogPage sendLogPage) {
+        Page<MtSendLog> pageHelper = PageHelper.startPage(sendLogPage.getPage(), sendLogPage.getPageSize());
         LambdaQueryWrapper<MtSendLog> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtSendLog::getStatus, StatusEnum.DISABLE.getKey());
 
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = sendLogPage.getStatus();
         if (StringUtils.isNotBlank(status)) {
             lambdaQueryWrapper.eq(MtSendLog::getStatus, status);
         }
-        String userId = paginationRequest.getSearchParams().get("userId") == null ? "" : paginationRequest.getSearchParams().get("userId").toString();
-        if (StringUtils.isNotBlank(userId)) {
+        Integer userId = sendLogPage.getUserId();
+        if (userId != null) {
             lambdaQueryWrapper.eq(MtSendLog::getUserId, userId);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = sendLogPage.getMerchantId();
+        if (merchantId != null) {
             lambdaQueryWrapper.eq(MtSendLog::getMerchantId, merchantId);
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotBlank(storeId)) {
+        Integer storeId = sendLogPage.getStoreId();
+        if (storeId != null) {
             lambdaQueryWrapper.eq(MtSendLog::getStoreId, storeId);
         }
-        String couponId = paginationRequest.getSearchParams().get("couponId") == null ? "" : paginationRequest.getSearchParams().get("couponId").toString();
-        if (StringUtils.isNotBlank(couponId)) {
+        Integer couponId = sendLogPage.getCouponId();
+        if (couponId != null) {
             lambdaQueryWrapper.eq(MtSendLog::getCouponId, couponId);
         }
-        String mobile = paginationRequest.getSearchParams().get("mobile") == null ? "" : paginationRequest.getSearchParams().get("mobile").toString();
+        String mobile = sendLogPage.getMobile();
         if (StringUtils.isNotBlank(mobile)) {
             lambdaQueryWrapper.eq(MtSendLog::getMobile, mobile);
         }
@@ -73,7 +74,7 @@ public class SendLogServiceImpl extends ServiceImpl<MtSendLogMapper, MtSendLog> 
         lambdaQueryWrapper.orderByDesc(MtSendLog::getId);
         List<MtSendLog> dataList = mtSendLogMapper.selectList(lambdaQueryWrapper);
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(sendLogPage.getPage(), sendLogPage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<MtSendLog> paginationResponse = new PaginationResponse(pageImpl, MtSendLog.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -87,7 +88,6 @@ public class SendLogServiceImpl extends ServiceImpl<MtSendLogMapper, MtSendLog> 
      * 添加发放记录
      *
      * @param  reqSendLogDto
-     * @throws BusinessCheckException
      * @return
      */
     @Override
@@ -118,30 +118,10 @@ public class SendLogServiceImpl extends ServiceImpl<MtSendLogMapper, MtSendLog> 
      * 根据ID查询发券记录
      *
      * @param id 发券记录ID
-     * @throws BusinessCheckException
      * @return
      */
     @Override
     public MtSendLog querySendLogById(Long id) {
         return mtSendLogMapper.selectById(id.intValue());
-    }
-
-    /**
-     * 根据ID删除发券记录
-     *
-     * @param  id 发券记录ID
-     * @param  operator 操作人
-     * @throws BusinessCheckException
-     * @return
-     */
-    @Override
-    public void deleteSendLog(Long id, String operator) {
-        MtSendLog mtSendLog = querySendLogById(id);
-        if (null == mtSendLog) {
-            return;
-        }
-        mtSendLog.setStatus(StatusEnum.DISABLE.getKey());
-        mtSendLog.setOperator(operator);
-        mtSendLogMapper.updateById(mtSendLog);
     }
 }

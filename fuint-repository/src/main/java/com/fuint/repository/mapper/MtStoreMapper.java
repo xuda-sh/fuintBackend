@@ -19,12 +19,12 @@ public interface MtStoreMapper extends BaseMapper<MtStore> {
 
     void resetDefaultStore(@Param("merchantId") Integer merchantId);
 
-    List<MtStore> findStoresByIds(@Param("ids") List<Integer> ids);
-
     List<StoreDistanceBean> queryByDistance(@Param("merchantId") Integer merchantId, @Param("keyword") String keyword, @Param("latitude") String latitude, @Param("longitude") String longitude);
 
     void deleteStoreByMerchant(@Param("merchantId") Integer merchantId);
 
     List<MtStore> getMyStoreList(@Param("merchantId") Integer merchantId, @Param("storeId") Integer storeId, @Param("status") String status);
+
+    List<MtStore> getStoreListByIds(@Param("merchantId") Integer merchantId, @Param("storeIds") List<Integer> storeIds);
 
 }

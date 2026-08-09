@@ -1,7 +1,7 @@
 package com.fuint.module.merchantApi.controller;
 
-import com.fuint.common.dto.StaffDto;
-import com.fuint.common.dto.UserInfo;
+import com.fuint.common.dto.member.UserInfo;
+import com.fuint.common.dto.merchant.StaffDto;
 import com.fuint.common.service.ConfirmLogService;
 import com.fuint.common.service.MemberService;
 import com.fuint.common.service.OrderService;
@@ -15,8 +15,11 @@ import com.fuint.repository.model.MtUser;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
-import org.springframework.web.bind.annotation.*;
-import javax.servlet.http.HttpServletRequest;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RestController;
+
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.HashMap;
@@ -60,8 +63,8 @@ public class MerchantController extends BaseController {
     @ApiOperation(value = "查询商户信息")
     @RequestMapping(value = "/info", method = RequestMethod.GET)
     @CrossOrigin
-    public ResponseObject info(HttpServletRequest request) throws BusinessCheckException {
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+    public ResponseObject info() throws BusinessCheckException {
+        UserInfo userInfo = TokenUtil.getUserInfo();
 
         MtUser mtUser = memberService.queryMemberById(userInfo.getId());
         Map<String, Object> outParams = new HashMap<>();

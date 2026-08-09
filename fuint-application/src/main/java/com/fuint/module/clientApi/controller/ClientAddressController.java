@@ -1,7 +1,7 @@
 package com.fuint.module.clientApi.controller;
 
-import com.fuint.common.dto.AddressDto;
-import com.fuint.common.dto.UserInfo;
+import com.fuint.common.dto.member.UserInfo;
+import com.fuint.common.dto.order.AddressDto;
 import com.fuint.common.enums.StatusEnum;
 import com.fuint.common.enums.YesOrNoEnum;
 import com.fuint.common.param.AddressDetailParam;
@@ -14,14 +14,12 @@ import com.fuint.module.clientApi.request.AddressRequest;
 import com.fuint.repository.mapper.MtRegionMapper;
 import com.fuint.repository.model.MtAddress;
 import com.fuint.repository.model.MtRegion;
-import com.fuint.utils.StringUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
-import java.lang.reflect.InvocationTargetException;
 import org.springframework.web.bind.annotation.*;
-import javax.servlet.http.HttpServletRequest;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -52,7 +50,7 @@ public class ClientAddressController extends BaseController {
     @ApiOperation(value="保存收货地址", notes="保存会员的收货地址")
     @RequestMapping(value = "/save", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject save(HttpServletRequest request, @RequestBody AddressRequest address) throws BusinessCheckException {
+    public ResponseObject save(@RequestBody AddressRequest address) throws BusinessCheckException {
         String name = address.getName() == null ? "" : address.getName();
         String mobile = address.getMobile() == null ? "" : address.getMobile();
         Integer provinceId = address.getProvinceId() == null ? 0 : address.getProvinceId();
@@ -63,7 +61,7 @@ public class ClientAddressController extends BaseController {
         String isDefault = address.getIsDefault() == null ? "" : address.getIsDefault();
         Integer addressId = address.getAddressId() == null ? 0 : address.getAddressId();
 
-        UserInfo mtUser = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo mtUser = TokenUtil.getUserInfo();
         MtAddress mtAddress = new MtAddress();
         mtAddress.setId(addressId);
         mtAddress.setName(name);
@@ -86,11 +84,11 @@ public class ClientAddressController extends BaseController {
     @ApiOperation(value="获取个人收货地址列表", notes="获取个人收货地址列表")
     @RequestMapping(value = "/list", method = RequestMethod.GET)
     @CrossOrigin
-    public ResponseObject list(HttpServletRequest request) throws BusinessCheckException, InvocationTargetException, IllegalAccessException {
+    public ResponseObject list() throws BusinessCheckException {
         Map<String, Object> result = new HashMap<>();
         Map<String, Object> param = new HashMap<>();
 
-        UserInfo mtUser = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo mtUser = TokenUtil.getUserInfo();
         param.put("userId", mtUser.getId());
         param.put("status", StatusEnum.ENABLED.getKey());
         List<MtAddress> addressList = addressService.queryListByParams(param);
@@ -139,15 +137,10 @@ public class ClientAddressController extends BaseController {
     @ApiOperation(value="获取收货地址详情", notes="根据ID获取会员收货地址详情")
     @RequestMapping(value = "/detail", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject detail(HttpServletRequest request, @RequestBody AddressDetailParam addressDetailParam) throws BusinessCheckException, InvocationTargetException, IllegalAccessException {
-        String addressIdStr = addressDetailParam.getAddressId() == null ? "0" : addressDetailParam.getAddressId();
-        Integer addressId = 0;
-        if (StringUtil.isNotEmpty(addressIdStr)) {
-            addressId = Integer.parseInt(addressIdStr);
-        }
-
+    public ResponseObject detail(@RequestBody AddressDetailParam addressDetailParam) throws BusinessCheckException {
+        Integer addressId = addressDetailParam.getAddressId() == null ? 0 : addressDetailParam.getAddressId();
         Map<String, Object> result = new HashMap<>();
-        UserInfo mtUser = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo mtUser = TokenUtil.getUserInfo();
 
         MtAddress mtAddress = null;
         if (addressId > 0) {

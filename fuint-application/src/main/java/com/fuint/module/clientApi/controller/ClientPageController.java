@@ -1,12 +1,11 @@
 package com.fuint.module.clientApi.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fuint.common.dto.NavigationDto;
+import com.fuint.common.dto.content.NavigationDto;
 import com.fuint.common.enums.StatusEnum;
 import com.fuint.common.service.BannerService;
 import com.fuint.common.service.MerchantService;
 import com.fuint.common.service.SettingService;
-import com.fuint.framework.exception.BusinessCheckException;
 import com.fuint.framework.web.BaseController;
 import com.fuint.framework.web.ResponseObject;
 import com.fuint.repository.model.MtBanner;
@@ -15,6 +14,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
 import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;
@@ -53,7 +53,7 @@ public class ClientPageController extends BaseController {
     @ApiOperation(value = "获取首页页面数据")
     @RequestMapping(value = "/home", method = RequestMethod.GET)
     @CrossOrigin
-    public ResponseObject getPageData(HttpServletRequest request, @RequestParam Map<String, Object> param) throws BusinessCheckException, JsonProcessingException {
+    public ResponseObject getPageData(HttpServletRequest request, @RequestParam Map<String, Object> param) throws JsonProcessingException {
         String merchantNo = request.getHeader("merchantNo") == null ? "" : request.getHeader("merchantNo");
         Integer storeId = StringUtil.isEmpty(request.getHeader("storeId")) ? 0 : Integer.parseInt(request.getHeader("storeId"));
 

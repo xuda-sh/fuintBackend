@@ -2,14 +2,17 @@ package com.fuint.common.util;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fuint.common.Constants;
-import com.fuint.common.dto.AccountInfo;
-import com.fuint.common.dto.UserInfo;
+import com.fuint.common.dto.system.AccountInfo;
+import com.fuint.common.dto.member.UserInfo;
 import com.fuint.utils.StringUtil;
 import nl.bitwalker.useragentutils.UserAgent;
-import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import javax.servlet.http.HttpServletRequest;
+import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Random;
 
 /**
  * 登录Token服务接口
@@ -17,10 +20,50 @@ import java.util.Random;
  * Created by FSQ
  * CopyRight https://www.fuint.cn
  */
-@Component
 public class TokenUtil {
 
-    public static int TOKEN_OVER_TIME = 604800;
+    public static final int TOKEN_OVER_TIME = 604800;
+
+    public static final String TOKEN_NAME = "Access-Token";
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    public static HttpServletRequest getCurrentRequest() {
+        ServletRequestAttributes attributes =
+                (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+        return attributes.getRequest();
+    }
+
+    /**
+     * 获取后台登录用户信息
+     * */
+    public static AccountInfo getAccountInfo() {
+        return getAccountInfoByToken(getCurrentRequest().getHeader(TOKEN_NAME));
+    }
+
+    /**
+     * 获取会员登录信息
+     * */
+    public static UserInfo getUserInfo() {
+        return getUserInfoByToken(getCurrentRequest().getHeader(TOKEN_NAME));
+    }
+
+    /**
+     * 构建Token源字符串（各生成方法共用）
+     */
+    private static String buildTokenSource(String userAgent, Integer userId) {
+        StringBuilder stringBuilder = new StringBuilder();
+        UserAgent userAgent1 = UserAgent.parseUserAgentString(userAgent);
+        if (userAgent1.getOperatingSystem().isMobileDevice()) {
+            stringBuilder.append("APP_");
+        } else {
+            stringBuilder.append("PC_");
+        }
+        stringBuilder.append(userId);
+        stringBuilder.append(new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date()) + "_");
+        stringBuilder.append(SECURE_RANDOM.nextInt(900000) + 100000);
+        return stringBuilder.toString();
+    }
 
     /**
      * 生成token
@@ -30,18 +73,7 @@ public class TokenUtil {
      * @return
      * */
     public static String generateToken(String userAgent, Integer userId) {
-        StringBuilder stringBuilder = new StringBuilder();
-        UserAgent userAgent1 = UserAgent.parseUserAgentString(userAgent);
-        if (userAgent1.getOperatingSystem().isMobileDevice()) {
-            stringBuilder.append("APP_");
-        } else {
-            stringBuilder.append("PC_");
-        }
-
-        stringBuilder.append(userId);
-        stringBuilder.append(new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date()) + "_");
-        stringBuilder.append(new Random().nextInt((999999 - 111111 + 1)) + 111111);
-        String token = MD5Util.getMD5(stringBuilder.toString()).replace("+", "1").replaceAll("&", "8");
+        String token = SHAUtil.sha256(buildTokenSource(userAgent, userId));
 
         UserInfo userLoginInfo = new UserInfo();
         userLoginInfo.setId(userId);
@@ -59,18 +91,7 @@ public class TokenUtil {
      * @return
      * */
     public static String generateToken(String userAgent, AccountInfo accountInfo) {
-        StringBuilder stringBuilder = new StringBuilder();
-        UserAgent userAgent1 = UserAgent.parseUserAgentString(userAgent);
-        if (userAgent1.getOperatingSystem().isMobileDevice()) {
-            stringBuilder.append("APP_");
-        } else {
-            stringBuilder.append("PC_");
-        }
-
-        stringBuilder.append(accountInfo.getId());
-        stringBuilder.append(new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date()) + "_");
-        stringBuilder.append(new Random().nextInt((999999 - 111111 + 1)) + 111111);
-        String token = MD5Util.getMD5(stringBuilder.toString()).replace("+", "1").replaceAll("&", "8");
+        String token = SHAUtil.sha256(buildTokenSource(userAgent, accountInfo.getId()));
 
         accountInfo.setToken(token);
         saveAccountToken(accountInfo);
@@ -129,13 +150,16 @@ public class TokenUtil {
     }
 
     /**
-     * 删除登录信息
+     * 删除登录信息（同时清除会员和后台两种可能的token）
      *
      * @param token
      * @return
      * */
     public static boolean removeToken(String token) {
-        RedisUtil.remove(token);
+        if (StringUtil.isNotEmpty(token)) {
+            RedisUtil.remove(Constants.SESSION_USER + token);
+            RedisUtil.remove(Constants.SESSION_ADMIN_USER + token);
+        }
         AuthUserUtil.clean();
         return true;
     }

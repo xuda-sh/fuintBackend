@@ -5,10 +5,11 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fuint.common.Constants;
 import com.fuint.common.config.Message;
-import com.fuint.common.dto.CouponDto;
-import com.fuint.common.dto.MyCouponDto;
+import com.fuint.common.dto.coupon.CouponDto;
+import com.fuint.common.dto.coupon.MyCouponDto;
 import com.fuint.common.enums.*;
 import com.fuint.common.param.CouponReceiveParam;
+import com.fuint.common.param.UserCouponPage;
 import com.fuint.common.service.*;
 import com.fuint.common.util.CommonUtil;
 import com.fuint.common.util.DateUtil;
@@ -29,6 +30,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -87,44 +89,44 @@ public class UserCouponServiceImpl extends ServiceImpl<MtUserCouponMapper, MtUse
     /**
      * 分页查询券列表
      *
-     * @param paginationRequest
+     * @param userCouponPage
      * @return
      */
     @Override
-    public PaginationResponse<MtUserCoupon> queryUserCouponListByPagination(PaginationRequest paginationRequest) {
+    public PaginationResponse<MtUserCoupon> queryUserCouponListByPagination(UserCouponPage userCouponPage) {
         LambdaQueryWrapper<MtUserCoupon> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtUserCoupon::getStatus, StatusEnum.DISABLE.getKey());
 
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = userCouponPage.getStatus();
         if (StringUtils.isNotBlank(status)) {
             lambdaQueryWrapper.eq(MtUserCoupon::getStatus, status);
         }
-        String userCouponId = paginationRequest.getSearchParams().get("userCouponId") == null ? "" : paginationRequest.getSearchParams().get("userCouponId").toString();
-        if (StringUtils.isNotBlank(userCouponId)) {
+        Integer userCouponId = userCouponPage.getId();
+        if (userCouponId != null && userCouponId > 0) {
             lambdaQueryWrapper.eq(MtUserCoupon::getId, userCouponId);
         }
-        String userId = paginationRequest.getSearchParams().get("userId") == null ? "" : paginationRequest.getSearchParams().get("userId").toString();
-        if (StringUtils.isNotBlank(userId)) {
+        Integer userId = userCouponPage.getUserId();
+        if (userId != null && userId > 0) {
             lambdaQueryWrapper.eq(MtUserCoupon::getUserId, userId);
         }
-        String couponId = paginationRequest.getSearchParams().get("couponId") == null ? "" : paginationRequest.getSearchParams().get("couponId").toString();
-        if (StringUtils.isNotBlank(couponId)) {
+        Integer couponId = userCouponPage.getCouponId();
+        if (couponId != null && couponId > 0) {
             lambdaQueryWrapper.eq(MtUserCoupon::getCouponId, couponId);
         }
-        String code = paginationRequest.getSearchParams().get("code") == null ? "" : paginationRequest.getSearchParams().get("code").toString();
+        String code = userCouponPage.getCode();
         if (StringUtils.isNotBlank(code)) {
             lambdaQueryWrapper.eq(MtUserCoupon::getCode, code);
         }
-        String mobile = paginationRequest.getSearchParams().get("mobile") == null ? "" : paginationRequest.getSearchParams().get("mobile").toString();
+        String mobile = userCouponPage.getMobile();
         if (StringUtils.isNotBlank(mobile)) {
             lambdaQueryWrapper.eq(MtUserCoupon::getMobile, mobile);
         }
 
         lambdaQueryWrapper.orderByDesc(MtUserCoupon::getId);
-        Page<MtUserCoupon> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        Page<MtUserCoupon> pageHelper = PageHelper.startPage(userCouponPage.getPage(), userCouponPage.getPageSize());
         List<MtUserCoupon> dataList = mtUserCouponMapper.selectList(lambdaQueryWrapper);
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(userCouponPage.getPage(), userCouponPage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<MtUserCoupon> paginationResponse = new PaginationResponse(pageImpl, MtUserCoupon.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -225,6 +227,14 @@ public class UserCouponServiceImpl extends ServiceImpl<MtUserCouponMapper, MtUse
         if (couponInfo.getPoint() != null && couponInfo.getPoint() > 0) {
             if (userInfo.getPoint() < couponInfo.getPoint()) {
                 throw new BusinessCheckException(Message.POINT_LIMIT);
+            }
+        }
+
+        // 发行总数量是否已经超额
+        if (couponInfo.getTotal() != null && couponInfo.getTotal() > 0) {
+            Long sendNum = mtUserCouponMapper.getSendNum(couponId);
+            if (sendNum.compareTo(Long.valueOf(couponInfo.getTotal())) >= 0) {
+                throw new BusinessCheckException(Message.COUPON_SEND_OUT);
             }
         }
 
@@ -343,12 +353,11 @@ public class UserCouponServiceImpl extends ServiceImpl<MtUserCouponMapper, MtUse
      * 获取会员卡券列表
      *
      * @param paramMap
-     * @throws BusinessCheckException
      * @return
      * */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public ResponseObject getUserCouponList(Map<String, Object> paramMap) throws BusinessCheckException {
+    public ResponseObject getUserCouponList(Map<String, Object> paramMap) {
         Integer pageNumber = paramMap.get("pageNumber") == null ? Constants.PAGE_NUMBER : Integer.parseInt(paramMap.get("pageNumber").toString());
         Integer pageSize = paramMap.get("pageSize") == null ? Constants.PAGE_SIZE : Integer.parseInt(paramMap.get("pageSize").toString());
         String userId = paramMap.get("userId") == null ? "" : paramMap.get("userId").toString();
@@ -546,7 +555,7 @@ public class UserCouponServiceImpl extends ServiceImpl<MtUserCouponMapper, MtUse
      * @return
      * */
     @Override
-    public List<CouponDto> getPayAbleCouponList(Integer userId, Integer storeId, String useFor) throws BusinessCheckException {
+    public List<CouponDto> getPayAbleCouponList(Integer userId, Integer storeId, String useFor) {
         List<String> statusList = Arrays.asList(UserCouponStatusEnum.UNUSED.getKey());
         List<MtUserCoupon> userCouponList = mtUserCouponMapper.getUserCouponList(userId, statusList);
         List<CouponDto> dataList = new ArrayList<>();
@@ -645,16 +654,24 @@ public class UserCouponServiceImpl extends ServiceImpl<MtUserCouponMapper, MtUse
      * */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean buyCouponItem(Integer orderId, Integer couponId, Integer userId, String mobile, Double num) throws BusinessCheckException {
+    public boolean buyCouponItem(Integer orderId, Integer couponId, Integer userId, String mobile, Double num) {
         if (num == null || num <= 0) {
             num = 1.0;
+        }
+        MtOrder orderInfo = orderService.getOrderInfo(orderId);
+        Integer storeId = 0;
+        if (orderInfo != null) {
+            storeId = orderInfo.getStoreId();
         }
         for (int j = 0; j < num; j++) {
             MtCoupon couponInfo = couponService.queryCouponById(couponId);
             MtUserCoupon userCoupon = new MtUserCoupon();
             userCoupon.setCouponId(couponId);
             userCoupon.setMerchantId(couponInfo.getMerchantId());
-            userCoupon.setStoreId(couponInfo.getStoreId());
+            if (storeId == null || storeId <= 0) {
+                storeId = couponInfo.getStoreId();
+            }
+            userCoupon.setStoreId(storeId);
             userCoupon.setType(couponInfo.getType());
             userCoupon.setGroupId(couponInfo.getGroupId());
             userCoupon.setMobile(mobile);
@@ -665,10 +682,10 @@ public class UserCouponServiceImpl extends ServiceImpl<MtUserCouponMapper, MtUse
             userCoupon.setExpireTime(couponInfo.getEndTime());
             if (couponInfo.getExpireType().equals(CouponExpireTypeEnum.FLEX.getKey())) {
                 Date expireTime = new Date();
-                Calendar c = Calendar.getInstance();
-                c.setTime(expireTime);
-                c.add(Calendar.DATE, couponInfo.getExpireTime());
-                expireTime = c.getTime();
+                Calendar calendar = Calendar.getInstance();
+                calendar.setTime(expireTime);
+                calendar.add(Calendar.DATE, couponInfo.getExpireTime());
+                expireTime = calendar.getTime();
                 userCoupon.setExpireTime(expireTime);
             }
             userCoupon.setOrderId(orderId);
@@ -676,7 +693,6 @@ public class UserCouponServiceImpl extends ServiceImpl<MtUserCouponMapper, MtUse
             // 如果购买的是储值卡
             if (couponInfo.getType().equals(CouponTypeEnum.PRESTORE.getKey()) && couponInfo.getInRule() != null) {
                 String[] paramArr = couponInfo.getInRule().split(","); // 100_200,300_500
-                MtOrder orderInfo = orderService.getOrderInfo(orderId);
                 if (orderInfo != null) {
                     BigDecimal payAmount = orderInfo.getPayAmount();
                     BigDecimal totalAmount = new BigDecimal(0);
@@ -698,8 +714,6 @@ public class UserCouponServiceImpl extends ServiceImpl<MtUserCouponMapper, MtUse
 
             userCoupon.setAmount(couponInfo.getAmount());
             userCoupon.setBalance(couponInfo.getAmount());
-
-            // 16位随机数
             String code = SeqUtil.getRandomNumber(16);
             userCoupon.setCode(code);
             userCoupon.setUuid(code);

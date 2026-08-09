@@ -1,7 +1,7 @@
 package com.fuint.common.service;
 
+import com.fuint.common.param.GenCodePage;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.model.TGenCode;
 
@@ -16,10 +16,10 @@ public interface GenCodeService {
     /**
      * 分页查询列表
      *
-     * @param paginationRequest
+     * @param genCodePage
      * @return
      */
-    PaginationResponse<TGenCode> queryGenCodeListByPagination(PaginationRequest paginationRequest) throws BusinessCheckException;
+    PaginationResponse<TGenCode> queryGenCodeListByPagination(GenCodePage genCodePage);
 
     /**
      * 添加生成代码
@@ -34,10 +34,9 @@ public interface GenCodeService {
      * 根据ID获取信息
      *
      * @param  id
-     * @throws BusinessCheckException
      * @return
      */
-    TGenCode queryGenCodeById(Integer id) throws BusinessCheckException;
+    TGenCode queryGenCodeById(Integer id);
 
     /**
      * 更新生成代码
@@ -45,11 +44,11 @@ public interface GenCodeService {
      * @throws BusinessCheckException
      * @return
      * */
-    TGenCode updateGenCode(TGenCode tGenCode) throws BusinessCheckException;
+    TGenCode updateGenCode(TGenCode tGenCode);
 
     /**
      * 生成代码（自定义路径）
-     * 
+     *
      * @param tableName 表名称
      * @return
      */

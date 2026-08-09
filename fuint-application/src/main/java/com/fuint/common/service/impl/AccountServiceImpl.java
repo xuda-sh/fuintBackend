@@ -3,18 +3,19 @@ package com.fuint.common.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fuint.common.dto.AccountDto;
-import com.fuint.common.dto.AccountInfo;
+import com.fuint.common.dto.system.AccountDto;
+import com.fuint.common.dto.system.AccountInfo;
 import com.fuint.common.enums.StatusEnum;
+import com.fuint.common.param.AccountPage;
 import com.fuint.common.service.AccountService;
 import com.fuint.common.service.CaptchaService;
+import com.fuint.common.service.MerchantService;
 import com.fuint.common.service.StaffService;
 import com.fuint.common.service.StoreService;
 import com.fuint.common.util.TokenUtil;
 import com.fuint.framework.annoation.OperationServiceLog;
 import com.fuint.framework.exception.BusinessCheckException;
 import com.fuint.framework.exception.BusinessRuntimeException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.module.backendApi.request.LoginRequest;
 import com.fuint.module.backendApi.response.LoginResponse;
@@ -28,10 +29,12 @@ import com.github.pagehelper.PageHelper;
 import lombok.AllArgsConstructor;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.*;
 
 /**
@@ -41,7 +44,7 @@ import java.util.*;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class AccountServiceImpl extends ServiceImpl<TAccountMapper, TAccount> implements AccountService {
 
     private TAccountMapper tAccountMapper;
@@ -65,6 +68,11 @@ public class AccountServiceImpl extends ServiceImpl<TAccountMapper, TAccount> im
     private StoreService storeService;
 
     /**
+     * 商户服务接口
+     * */
+    private MerchantService merchantService;
+
+    /**
      * 验证码服务接口
      * */
     private CaptchaService captchaService;
@@ -72,37 +80,37 @@ public class AccountServiceImpl extends ServiceImpl<TAccountMapper, TAccount> im
     /**
      * 分页查询账号列表
      *
-     * @param paginationRequest
+     * @param accountPage
      * @return
      */
     @Override
-    public PaginationResponse<AccountDto> getAccountListByPagination(PaginationRequest paginationRequest) {
-        Page<MtBanner> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<AccountDto> getAccountListByPagination(AccountPage accountPage) {
+        Page<MtBanner> pageHelper = PageHelper.startPage(accountPage.getPage(), accountPage.getPageSize());
         LambdaQueryWrapper<TAccount> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(TAccount::getAccountStatus, -1); // 1:启用；0:禁用；-1:删除
 
-        String name = paginationRequest.getSearchParams().get("name") == null ? "" : paginationRequest.getSearchParams().get("name").toString();
+        String name = accountPage.getAccountName();
         if (StringUtils.isNotEmpty(name)) {
             lambdaQueryWrapper.like(TAccount::getAccountName, name);
         }
-        String realName = paginationRequest.getSearchParams().get("realName") == null ? "" : paginationRequest.getSearchParams().get("realName").toString();
+        String realName = accountPage.getRealName();
         if (StringUtils.isNotEmpty(realName)) {
             lambdaQueryWrapper.like(TAccount::getRealName, realName);
         }
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = accountPage.getAccountStatus();
         if (StringUtils.isNotEmpty(status)) {
             lambdaQueryWrapper.eq(TAccount::getAccountStatus, status);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotEmpty(merchantId)) {
+        Integer merchantId = accountPage.getMerchantId();
+        if (merchantId != null && merchantId > 0) {
             lambdaQueryWrapper.eq(TAccount::getMerchantId, merchantId);
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotEmpty(storeId)) {
+        Integer storeId = accountPage.getStoreId();
+        if (storeId != null && storeId > 0) {
             lambdaQueryWrapper.eq(TAccount::getStoreId, storeId);
         }
-        String staffId = paginationRequest.getSearchParams().get("staffId") == null ? "" : paginationRequest.getSearchParams().get("staffId").toString();
-        if (StringUtils.isNotEmpty(staffId)) {
+        Integer staffId = accountPage.getStaffId();
+        if (staffId != null && staffId > 0) {
             lambdaQueryWrapper.eq(TAccount::getStaffId, staffId);
         }
 
@@ -111,23 +119,23 @@ public class AccountServiceImpl extends ServiceImpl<TAccountMapper, TAccount> im
         List<AccountDto> dataList = new ArrayList<>();
 
         for (TAccount tAccount : accountList) {
-             AccountDto accountDto = new AccountDto();
-             BeanUtils.copyProperties(tAccount, accountDto);
-             accountDto.setId(tAccount.getAcctId());
-             MtMerchant mtMerchant = mtMerchantMapper.selectById(tAccount.getMerchantId());
-             if (mtMerchant != null) {
-                 accountDto.setMerchantName(mtMerchant.getName());
-             }
-             MtStore mtStore = mtStoreMapper.selectById(tAccount.getStoreId());
-             if (mtStore != null) {
-                 accountDto.setStoreName(mtStore.getName());
-             }
-             accountDto.setSalt(null);
-             accountDto.setPassword(null);
-             dataList.add(accountDto);
+            AccountDto accountDto = new AccountDto();
+            BeanUtils.copyProperties(tAccount, accountDto);
+            accountDto.setId(tAccount.getAcctId());
+            MtMerchant mtMerchant = mtMerchantMapper.selectById(tAccount.getMerchantId());
+            if (mtMerchant != null) {
+                accountDto.setMerchantName(mtMerchant.getName());
+            }
+            MtStore mtStore = mtStoreMapper.selectById(tAccount.getStoreId());
+            if (mtStore != null) {
+                accountDto.setStoreName(mtStore.getName());
+            }
+            accountDto.setSalt(null);
+            accountDto.setPassword(null);
+            dataList.add(accountDto);
         }
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(accountPage.getPage(), accountPage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<AccountDto> paginationResponse = new PaginationResponse(pageImpl, AccountDto.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -158,8 +166,7 @@ public class AccountServiceImpl extends ServiceImpl<TAccountMapper, TAccount> im
             accountInfo.setRoleIds(account.getRoleIds());
             accountInfo.setStaffId(account.getStaffId());
             accountInfo.setStoreId(account.getStoreId());
-            Integer merchantId = account.getMerchantId() == null ? 0 : account.getMerchantId();
-            accountInfo.setMerchantId(merchantId);
+            accountInfo.setMerchantId(account.getMerchantId());
             if (account.getMerchantId() != null && account.getMerchantId() > 0) {
                 MtMerchant mtMerchant = mtMerchantMapper.selectById(account.getMerchantId());
                 if (mtMerchant != null) {
@@ -186,8 +193,7 @@ public class AccountServiceImpl extends ServiceImpl<TAccountMapper, TAccount> im
      * */
     @Override
     public TAccount getAccountInfoById(Integer userId) {
-        TAccount tAccount = tAccountMapper.selectById(userId);
-        return tAccount;
+        return tAccountMapper.selectById(userId);
     }
 
     /**
@@ -198,7 +204,7 @@ public class AccountServiceImpl extends ServiceImpl<TAccountMapper, TAccount> im
      * */
     @Override
     @OperationServiceLog(description = "新增后台账户")
-    public TAccount createAccountInfo(TAccount tAccount, List<TDuty> duties) throws BusinessCheckException {
+    public TAccount createAccountInfo(TAccount tAccount, List<TDuty> duties) {
         TAccount account = new TAccount();
         account.setAccountKey(tAccount.getAccountKey());
         account.setAccountName(tAccount.getAccountName().toLowerCase());
@@ -217,7 +223,6 @@ public class AccountServiceImpl extends ServiceImpl<TAccountMapper, TAccount> im
         account.setStoreId(tAccount.getStoreId());
         account.setCreateDate(new Date());
         account.setModifyDate(new Date());
-        account.setStoreId(tAccount.getStoreId());
         account.setStaffId(tAccount.getStaffId());
         account.setPassword(tAccount.getPassword());
         this.entryptPassword(account);
@@ -300,11 +305,20 @@ public class AccountServiceImpl extends ServiceImpl<TAccountMapper, TAccount> im
      * 更新账户
      *
      * @param tAccount
+     * @param accountInfo
+     * @throws BusinessCheckException
+     * @return
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @OperationServiceLog(description = "修改后台账户")
-    public void updateAccount(TAccount tAccount) {
+    public void updateAccount(TAccount tAccount, AccountInfo accountInfo) throws BusinessCheckException {
+        if (tAccount == null || accountInfo == null) {
+            throw new BusinessCheckException("该账号不存在");
+        }
+        if (accountInfo.getMerchantId() > 0 && !accountInfo.getMerchantId().equals(tAccount.getMerchantId())) {
+            throw new BusinessCheckException("不同商户，无操作权限");
+        }
         tAccountMapper.updateById(tAccount);
     }
 
@@ -312,13 +326,21 @@ public class AccountServiceImpl extends ServiceImpl<TAccountMapper, TAccount> im
      * 删除账号
      *
      * @param accountId 账号ID
+     * @throws BusinessCheckException
      * @return
      * */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @OperationServiceLog(description = "删除后台账户")
-    public void deleteAccount(Long accountId) {
+    public void deleteAccount(Long accountId, AccountInfo accountInfo) throws BusinessCheckException {
         TAccount tAccount = tAccountMapper.selectById(accountId);
+        if (tAccount == null) {
+            throw new BusinessCheckException("该账号不存在");
+        }
+        if (accountInfo.getMerchantId() > 0 && !accountInfo.getMerchantId().equals(tAccount.getMerchantId())) {
+            throw new BusinessCheckException("不同商户，无操作权限");
+        }
+
         tAccount.setAccountStatus(-1);
         tAccount.setModifyDate(new Date());
         tAccountMapper.updateById(tAccount);
@@ -394,6 +416,9 @@ public class AccountServiceImpl extends ServiceImpl<TAccountMapper, TAccount> im
                     throw new BusinessCheckException("您的商户已被禁用，请联系平台方");
                 }
             }
+
+            // 商户有效期校验
+            merchantService.checkMerchantValid(tAccount.getMerchantId());
 
             // 店铺已禁用
             if (tAccount.getStoreId() != null && tAccount.getStoreId() > 0) {

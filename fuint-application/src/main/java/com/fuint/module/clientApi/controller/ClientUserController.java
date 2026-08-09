@@ -1,12 +1,15 @@
 package com.fuint.module.clientApi.controller;
 
 import com.alibaba.fastjson.JSONObject;
-import com.fuint.common.dto.AssetDto;
-import com.fuint.common.dto.UserDto;
-import com.fuint.common.dto.UserInfo;
+import com.fuint.common.dto.member.AssetDto;
+import com.fuint.common.dto.member.UserDto;
+import com.fuint.common.dto.member.UserInfo;
 import com.fuint.common.enums.*;
 import com.fuint.common.service.*;
-import com.fuint.common.util.*;
+import com.fuint.common.util.Base64Util;
+import com.fuint.common.util.DateUtil;
+import com.fuint.common.util.QRCodeUtil;
+import com.fuint.common.util.TokenUtil;
 import com.fuint.framework.exception.BusinessCheckException;
 import com.fuint.framework.web.BaseController;
 import com.fuint.framework.web.ResponseObject;
@@ -20,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
+
 import javax.servlet.http.HttpServletRequest;
 import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
@@ -96,7 +100,7 @@ public class ClientUserController extends BaseController {
         String isWechat = request.getHeader("isWechat") == null ? YesOrNoEnum.NO.getKey() : request.getHeader("isWechat");
         String platform = request.getHeader("platform") == null ? "" : request.getHeader("platform");
         String userNo = request.getParameter("code") == null ? "" : request.getParameter("code");
-        UserInfo loginInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo loginInfo = TokenUtil.getUserInfo();
         Integer merchantId = merchantService.getMerchantId(request.getHeader("merchantNo"));
         MtUser mtUser = null;
         if (loginInfo != null) {
@@ -164,6 +168,25 @@ public class ClientUserController extends BaseController {
             }
         }
 
+        // 是否需要强制更新头像或昵称
+        boolean needUpdateAvatar = false;
+        boolean needUpdateNickname = false;
+        if (mtUser != null && merchantId != null) {
+            boolean profileCompleted = YesOrNoEnum.YES.getKey().equals(mtUser.getProfileCompleted());
+            if (!profileCompleted) {
+                MtSetting avatarSetting = settingService.querySettingByName(merchantId, SettingTypeEnum.USER.getKey(), UserSettingEnum.FORCE_UPDATE_AVATAR.getKey());
+                MtSetting nicknameSetting = settingService.querySettingByName(merchantId, SettingTypeEnum.USER.getKey(), UserSettingEnum.FORCE_UPDATE_NICKNAME.getKey());
+                if (avatarSetting != null && YesOrNoEnum.TRUE.getKey().equals(avatarSetting.getValue())) {
+                    needUpdateAvatar = true;
+                }
+                if (nicknameSetting != null && YesOrNoEnum.TRUE.getKey().equals(nicknameSetting.getValue())) {
+                    needUpdateNickname = true;
+                }
+            }
+        }
+
+        outParams.put("needUpdateAvatar", needUpdateAvatar);
+        outParams.put("needUpdateNickname", needUpdateNickname);
         outParams.put("isMerchant", isMerchant);
         outParams.put("openWxCard", openWxCard);
 
@@ -176,9 +199,9 @@ public class ClientUserController extends BaseController {
     @ApiOperation(value = "获取会员资产数据")
     @RequestMapping(value = "/asset", method = RequestMethod.GET)
     @CrossOrigin
-    public ResponseObject asset(HttpServletRequest request) throws BusinessCheckException {
+    public ResponseObject asset(HttpServletRequest request) {
         String userId = request.getParameter("userId");
-        UserInfo mtUser = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo mtUser = TokenUtil.getUserInfo();
         if (StringUtil.isNotEmpty(userId)) {
             MtUser userInfo = memberService.queryMemberById(Integer.parseInt(userId));
             if (userInfo != null) {
@@ -240,6 +263,10 @@ public class ClientUserController extends BaseController {
                 outParams.put(UserSettingEnum.SUBMIT_ORDER_NEED_PHONE.getKey(), setting.getValue());
             } else if (setting.getName().equals(UserSettingEnum.LOGIN_NEED_PHONE.getKey())) {
                 outParams.put(UserSettingEnum.LOGIN_NEED_PHONE.getKey(), setting.getValue());
+            } else if (setting.getName().equals(UserSettingEnum.FORCE_UPDATE_AVATAR.getKey())) {
+                outParams.put(UserSettingEnum.FORCE_UPDATE_AVATAR.getKey(), setting.getValue());
+            } else if (setting.getName().equals(UserSettingEnum.FORCE_UPDATE_NICKNAME.getKey())) {
+                outParams.put(UserSettingEnum.FORCE_UPDATE_NICKNAME.getKey(), setting.getValue());
             }
         }
 
@@ -266,7 +293,7 @@ public class ClientUserController extends BaseController {
 
         String mobile = "";
         Integer merchantId = merchantService.getMerchantId(merchantNo);
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo userInfo = TokenUtil.getUserInfo();
         boolean modifyPassword = false;
         if (userInfo == null) {
             return getFailureResult(1001);
@@ -291,13 +318,29 @@ public class ClientUserController extends BaseController {
         }
 
         MtUser mtUser = memberService.queryMemberById(userInfo.getId());
+
+        // 强制更新校验：开启强制更新头像时，头像不能为空
+        MtSetting avatarSetting = settingService.querySettingByName(merchantId, SettingTypeEnum.USER.getKey(), UserSettingEnum.FORCE_UPDATE_AVATAR.getKey());
+        if (avatarSetting != null && YesOrNoEnum.TRUE.getKey().equals(avatarSetting.getValue())) {
+            if (StringUtil.isEmpty(avatar) && StringUtil.isEmpty(mtUser.getAvatar())) {
+                return getFailureResult(201, "请上传头像");
+            }
+        }
+
+        // 强制更新校验：开启强制修改昵称时，昵称不能为空
+        MtSetting nicknameSetting = settingService.querySettingByName(merchantId, SettingTypeEnum.USER.getKey(), UserSettingEnum.FORCE_UPDATE_NICKNAME.getKey());
+        if (nicknameSetting != null && YesOrNoEnum.TRUE.getKey().equals(nicknameSetting.getValue())) {
+            if (StringUtil.isEmpty(name) && StringUtil.isEmpty(mtUser.getName())) {
+                return getFailureResult(201, "请填写称呼");
+            }
+        }
+
         if (StringUtil.isNotEmpty(name)) {
             mtUser.setName(name);
         }
         if (StringUtil.isNotEmpty(password)) {
             if (StringUtil.isNotEmpty(passwordOld) && StringUtil.isNotEmpty(mtUser.getSalt())) {
-                String pass = memberService.deCodePassword(passwordOld, mtUser.getSalt());
-                if (!pass.equals(mtUser.getPassword())) {
+                if (!memberService.verifyPassword(passwordOld, mtUser.getPassword(), mtUser.getSalt())) {
                     return getFailureResult(201, "旧密码输入有误");
                 }
             }
@@ -317,6 +360,11 @@ public class ClientUserController extends BaseController {
             mtUser.setAvatar(avatar);
         }
 
+        // 头像和昵称都已设置时，标记资料已完善
+        if (StringUtil.isNotEmpty(mtUser.getAvatar()) && StringUtil.isNotEmpty(mtUser.getName())) {
+            mtUser.setProfileCompleted(YesOrNoEnum.YES.getKey());
+        }
+
         MtUser result = memberService.updateMember(mtUser, modifyPassword);
         return getSuccessResult(result);
     }
@@ -329,7 +377,7 @@ public class ClientUserController extends BaseController {
     @CrossOrigin
     public ResponseObject defaultStore(HttpServletRequest request) throws BusinessCheckException {
         Integer storeId = request.getParameter("storeId") == null ? 0 : Integer.parseInt(request.getParameter("storeId"));
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo userInfo = TokenUtil.getUserInfo();
         if (userInfo != null && storeId > 0) {
             MtUser mtUser = memberService.queryMemberById(userInfo.getId());
             memberService.updateMember(mtUser, false);
@@ -343,8 +391,8 @@ public class ClientUserController extends BaseController {
     @ApiOperation(value = "获取会员二维码")
     @RequestMapping(value = "/qrCode", method = RequestMethod.GET)
     @CrossOrigin
-    public ResponseObject qrCode(HttpServletRequest request) throws BusinessCheckException {
-        UserInfo loginInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+    public ResponseObject qrCode() {
+        UserInfo loginInfo = TokenUtil.getUserInfo();
         if (loginInfo == null) {
             return getFailureResult(1001);
         }

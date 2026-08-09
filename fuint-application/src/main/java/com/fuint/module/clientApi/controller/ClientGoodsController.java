@@ -1,22 +1,20 @@
 package com.fuint.module.clientApi.controller;
 
 import com.alibaba.fastjson.JSONObject;
-import com.fuint.common.Constants;
-import com.fuint.common.dto.*;
+import com.fuint.common.dto.goods.*;
 import com.fuint.common.enums.StatusEnum;
 import com.fuint.common.enums.YesOrNoEnum;
 import com.fuint.common.param.GoodsInfoParam;
+import com.fuint.common.param.GoodsListParam;
 import com.fuint.common.service.CateService;
 import com.fuint.common.service.GoodsService;
 import com.fuint.common.service.MerchantService;
 import com.fuint.common.service.SettingService;
 import com.fuint.common.util.CommonUtil;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.framework.web.BaseController;
 import com.fuint.framework.web.ResponseObject;
-import com.fuint.module.clientApi.request.GoodsSearchRequest;
 import com.fuint.repository.model.MtGoods;
 import com.fuint.repository.model.MtGoodsCate;
 import com.fuint.repository.model.MtGoodsSku;
@@ -26,8 +24,8 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
 import javax.servlet.http.HttpServletRequest;
-import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 /**
@@ -68,7 +66,7 @@ public class ClientGoodsController extends BaseController {
     @ApiOperation(value = "获取商品分类列表")
     @RequestMapping(value = "/cateList", method = RequestMethod.GET)
     @CrossOrigin
-    public ResponseObject cateList(HttpServletRequest request) throws BusinessCheckException {
+    public ResponseObject cateList(HttpServletRequest request) {
         String merchantNo = request.getHeader("merchantNo") == null ? "" : request.getHeader("merchantNo");
         Integer storeId = StringUtil.isEmpty(request.getHeader("storeId")) ? 0 : Integer.parseInt(request.getHeader("storeId"));
         String platform = request.getHeader("platform") == null ? "" : request.getHeader("platform");
@@ -98,7 +96,9 @@ public class ClientGoodsController extends BaseController {
              }
              dto.setGoodsList(goodsArr);
              dto.setSort((goodsArr.size() > 0) ? 1 : 0);
-             result.add(dto);
+             if (goodsArr.size() > 0) {
+                 result.add(dto);
+             }
         }
         // 商品数量为0就排在后面
         Collections.sort(result, (p1, p2) -> Integer.compare(p2.getSort(), p1.getSort()));
@@ -114,7 +114,7 @@ public class ClientGoodsController extends BaseController {
     public ResponseObject list(HttpServletRequest request) throws BusinessCheckException {
         Integer storeId = StringUtil.isEmpty(request.getHeader("storeId")) ? 0 : Integer.parseInt(request.getHeader("storeId"));
         String platform = request.getHeader("platform") == null ? "" : request.getHeader("platform");
-        Map<String, Object> goodsData = goodsService.getStoreGoodsList(storeId, "", platform, 0,1, 200);
+        Map<String, Object> goodsData = goodsService.getStoreGoodsList(storeId, "", platform, 0,1, 300);
         return getSuccessResult(goodsData.get("goodsList"));
     }
 
@@ -124,45 +124,23 @@ public class ClientGoodsController extends BaseController {
     @ApiOperation(value = "搜索商品")
     @RequestMapping(value = "/search", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject search(HttpServletRequest request, @RequestBody GoodsSearchRequest params) throws BusinessCheckException {
+    public ResponseObject search(HttpServletRequest request, @RequestBody GoodsListParam params) {
         Integer storeId = StringUtil.isEmpty(request.getHeader("storeId")) ? 0 : Integer.parseInt(request.getHeader("storeId"));
         String merchantNo = request.getHeader("merchantNo") == null ? "" : request.getHeader("merchantNo");
         String platform = request.getHeader("platform") == null ? "" : request.getHeader("platform");
-        Integer page = params.getPage() == null ? 1 : params.getPage();
-        Integer pageSize = params.getPageSize() == null ? Constants.PAGE_SIZE : params.getPageSize();
-        String name = params.getName() == null ? "" : params.getName();
-        Integer cateId = params.getCateId() == null ? 0 : params.getCateId();
-        String sortType = params.getSortType() == null ? "all" : params.getSortType();
-        String sortPrice = params.getSortPrice() == null ? "0" : params.getSortPrice();
-
-        Map<String, Object> searchParams = new HashMap<>();
-        searchParams.put("status", StatusEnum.ENABLED.getKey());
-        searchParams.put("hasPrice", YesOrNoEnum.YES.getKey());
-        if (storeId > 0) {
-            searchParams.put("storeId", storeId.toString());
-        }
-        if (cateId > 0) {
-            searchParams.put("cateId", cateId);
-        }
-        if (StringUtil.isNotEmpty(name)) {
-            searchParams.put("name", name);
-        }
         Integer merchantId = merchantService.getMerchantId(merchantNo);
         if (merchantId > 0 ) {
-            searchParams.put("merchantId", merchantId);
+            params.setMerchantId(merchantId);
         }
-        if (StringUtil.isNotEmpty(sortType)) {
-            searchParams.put("sortType", sortType);
+        if (storeId > 0) {
+            params.setStoreId(storeId);
         }
-        if (StringUtil.isNotEmpty(sortPrice)) {
-            searchParams.put("sortPrice", sortPrice);
+        if (StringUtil.isNotBlank(platform)) {
+            params.setPlatform(platform);
         }
-        if (StringUtil.isNotEmpty(platform)) {
-            searchParams.put("platform", platform);
-        }
-
-        PaginationResponse<GoodsDto> paginationResponse = goodsService.queryGoodsListByPagination(new PaginationRequest(page, pageSize, searchParams));
-
+        params.setStatus(StatusEnum.ENABLED.getKey());
+        params.setHasPrice(YesOrNoEnum.YES.getKey());
+        PaginationResponse<GoodsDto> paginationResponse = goodsService.queryGoodsListByPagination(params);
         return getSuccessResult(paginationResponse);
     }
 
@@ -172,7 +150,7 @@ public class ClientGoodsController extends BaseController {
     @ApiOperation(value = "获取商品详情")
     @RequestMapping(value = "/detail", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject detail(@RequestBody GoodsInfoParam goodsInfoParam) throws BusinessCheckException, InvocationTargetException, IllegalAccessException {
+    public ResponseObject detail(@RequestBody GoodsInfoParam goodsInfoParam) throws BusinessCheckException {
         String goodsId = goodsInfoParam.getGoodsId() == null ? "0" : goodsInfoParam.getGoodsId();
         if (StringUtil.isEmpty(goodsId)) {
             return getFailureResult(2000, "商品ID不能为空");
@@ -191,6 +169,7 @@ public class ClientGoodsController extends BaseController {
         goodsDetailDto.setSort(goodsDto.getSort());
         goodsDetailDto.setCanUsePoint(goodsDto.getCanUsePoint());
         goodsDetailDto.setIsMemberDiscount(goodsDto.getIsMemberDiscount());
+        goodsDetailDto.setGradeIds(goodsDto.getGradeIds());
 
         List<String> images = JSONObject.parseArray(goodsDto.getImages(), String.class);
         List<String> imageList = new ArrayList<>();
@@ -292,7 +271,7 @@ public class ClientGoodsController extends BaseController {
     @ApiOperation(value = "通过sku编码获取商品信息")
     @RequestMapping(value = "/getGoodsInfoBySkuNo", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject getGoodsInfoBySkuNo(HttpServletRequest request, @RequestBody GoodsInfoParam goodsInfoParam) throws BusinessCheckException, InvocationTargetException, IllegalAccessException {
+    public ResponseObject getGoodsInfoBySkuNo(HttpServletRequest request, @RequestBody GoodsInfoParam goodsInfoParam) throws BusinessCheckException {
         String merchantNo = request.getHeader("merchantNo") == null ? "" : request.getHeader("merchantNo");
         String skuNo = goodsInfoParam.getSkuNo() == null ? "" : goodsInfoParam.getSkuNo();
         if (StringUtil.isEmpty(skuNo)) {

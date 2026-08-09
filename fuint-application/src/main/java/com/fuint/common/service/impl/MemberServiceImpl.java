@@ -4,16 +4,16 @@ import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fuint.common.dto.AccountInfo;
-import com.fuint.common.dto.GroupMemberDto;
-import com.fuint.common.dto.MemberTopDto;
-import com.fuint.common.dto.UserDto;
+import com.fuint.common.dto.member.GroupMemberDto;
+import com.fuint.common.dto.member.MemberTopDto;
+import com.fuint.common.dto.member.UserDto;
+import com.fuint.common.dto.system.AccountInfo;
 import com.fuint.common.enums.*;
+import com.fuint.common.param.MemberPage;
 import com.fuint.common.service.*;
 import com.fuint.common.util.*;
 import com.fuint.framework.annoation.OperationServiceLog;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.bean.MemberTopBean;
 import com.fuint.repository.mapper.MtUserActionMapper;
@@ -105,6 +105,11 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
     private CommissionRelationService commissionRelationService;
 
     /**
+     * 会员标签关联服务接口
+     */
+    private UserTagRelationService userTagRelationService;
+
+    /**
      * 更新活跃时间
      * @param userId 会员ID
      * @param ip IP地址
@@ -159,7 +164,7 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
      * @return
      * */
     @Override
-    public MtUser getCurrentUserInfo(HttpServletRequest request, Integer userId, String token) throws BusinessCheckException {
+    public MtUser getCurrentUserInfo(HttpServletRequest request, Integer userId, String token) {
         MtUser mtUser = null;
 
         // 没有会员信息，则查询是否是后台收银员下单
@@ -197,24 +202,24 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
     /**
      * 分页查询会员列表
      *
-     * @param paginationRequest
+     * @param memberPage
      * @return
      */
     @Override
-    public PaginationResponse<UserDto> queryMemberListByPagination(PaginationRequest paginationRequest) throws BusinessCheckException {
-        Page<MtUser> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<UserDto> queryMemberListByPagination(MemberPage memberPage) {
+        Page<MtUser> pageHelper = PageHelper.startPage(memberPage.getPage(), memberPage.getPageSize());
         LambdaQueryWrapper<MtUser> wrapper = Wrappers.lambdaQuery();
         wrapper.ne(MtUser::getStatus, StatusEnum.DISABLE.getKey());
         wrapper.eq(MtUser::getIsStaff, YesOrNoEnum.NO.getKey());
-        String name = paginationRequest.getSearchParams().get("name") == null ? "" : paginationRequest.getSearchParams().get("name").toString();
+        String name = memberPage.getName();
         if (StringUtils.isNotBlank(name)) {
             wrapper.like(MtUser::getName, name);
         }
-        String id = paginationRequest.getSearchParams().get("id") == null ? "" : paginationRequest.getSearchParams().get("id").toString();
-        if (StringUtils.isNotBlank(id)) {
-            wrapper.eq(MtUser::getId, id);
+        Integer userId = memberPage.getId();
+        if (userId != null && userId > 0) {
+            wrapper.eq(MtUser::getId, userId);
         }
-        String keyword = paginationRequest.getSearchParams().get("keyword") == null ? "" : paginationRequest.getSearchParams().get("keyword").toString();
+        String keyword = memberPage.getKeyword();
         if (StringUtils.isNotBlank(keyword)) {
             wrapper.and(wq -> wq
                     .eq(MtUser::getMobile, keyword)
@@ -223,51 +228,71 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
                     .or()
                     .eq(MtUser::getName, keyword));
         }
-        String mobile = paginationRequest.getSearchParams().get("mobile") == null ? "" : paginationRequest.getSearchParams().get("mobile").toString();
+        String mobile = memberPage.getMobile();
         if (StringUtils.isNotBlank(mobile)) {
             wrapper.like(MtUser::getMobile, mobile);
         }
-        String birthday = paginationRequest.getSearchParams().get("birthday") == null ? "" : paginationRequest.getSearchParams().get("birthday").toString();
+        String birthday = memberPage.getBirthday();
         if (StringUtils.isNotBlank(birthday)) {
             wrapper.like(MtUser::getBirthday, birthday);
         }
-        String userNo = paginationRequest.getSearchParams().get("userNo") == null ? "" : paginationRequest.getSearchParams().get("userNo").toString();
+        String userNo = memberPage.getUserNo();
         if (StringUtils.isNotBlank(userNo)) {
             wrapper.eq(MtUser::getUserNo, userNo);
         }
-        String gradeId = paginationRequest.getSearchParams().get("gradeId") == null ? "" : paginationRequest.getSearchParams().get("gradeId").toString();
-        if (StringUtils.isNotBlank(gradeId)) {
+        Integer gradeId = memberPage.getGradeId();
+        if (gradeId != null && gradeId > 0) {
             wrapper.eq(MtUser::getGradeId, gradeId);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = memberPage.getMerchantId();
+        if (merchantId != null && merchantId > 0) {
             wrapper.eq(MtUser::getMerchantId, merchantId);
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotBlank(storeId)) {
+        Integer storeId = memberPage.getStoreId();
+        if (storeId != null && storeId > 0) {
             wrapper.eq(MtUser::getStoreId, storeId);
         }
-        String storeIds = paginationRequest.getSearchParams().get("storeIds") == null ? "" : paginationRequest.getSearchParams().get("storeIds").toString();
+        String storeIds = memberPage.getStoreIds();
         if (StringUtils.isNotBlank(storeIds)) {
             List<String> idList = Arrays.asList(storeIds.split(","));
             if (idList.size() > 0) {
                 wrapper.in(MtUser::getStoreId, idList);
             }
         }
-        String groupIds = paginationRequest.getSearchParams().get("groupIds") == null ? "" : paginationRequest.getSearchParams().get("groupIds").toString();
+        String groupIds = memberPage.getGroupIds();
         if (StringUtils.isNotBlank(groupIds)) {
             List<String> idList = Arrays.asList(groupIds.split(","));
             if (idList.size() > 0) {
                 wrapper.in(MtUser::getGroupId, idList);
             }
         }
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        // 会员标签筛选
+        String tagIds = memberPage.getTagIds();
+        if (StringUtils.isNotBlank(tagIds)) {
+            List<String> tagIdList = Arrays.asList(tagIds.split(","));
+            if (tagIdList.size() > 0) {
+                Set<Integer> userIdSet = new HashSet<>();
+                for (String tagId : tagIdList) {
+                    List<Integer> userIds = userTagRelationService.getUserIdsByTagId(Integer.parseInt(tagId.trim()));
+                    if (userIds != null && userIds.size() > 0) {
+                        userIdSet.addAll(userIds);
+                    }
+                }
+                if (userIdSet.size() > 0) {
+                    wrapper.in(MtUser::getId, userIdSet);
+                } else {
+                    // 没有匹配的用户，直接返回空结果
+                    wrapper.eq(MtUser::getId, -1);
+                }
+            }
+        }
+        String status = memberPage.getStatus();
         if (StringUtils.isNotBlank(status)) {
             wrapper.eq(MtUser::getStatus, status);
         }
         // 注册开始、结束时间
-        String startTime = paginationRequest.getSearchParams().get("startTime") == null ? "" : paginationRequest.getSearchParams().get("startTime").toString();
-        String endTime = paginationRequest.getSearchParams().get("endTime") == null ? "" : paginationRequest.getSearchParams().get("endTime").toString();
+        String startTime = memberPage.getStartTime();
+        String endTime = memberPage.getEndTime();
         if (StringUtil.isNotEmpty(startTime)) {
             wrapper.ge(MtUser::getCreateTime, startTime);
         }
@@ -275,7 +300,7 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
             wrapper.le(MtUser::getCreateTime, endTime);
         }
         // 注册时间
-        String regTime = paginationRequest.getSearchParams().get("regTime") == null ? "" : paginationRequest.getSearchParams().get("regTime").toString();
+        String regTime = memberPage.getRegTime();
         if (StringUtil.isNotEmpty(regTime)) {
             String[] dateTime = regTime.split("~");
             if (dateTime.length == 2) {
@@ -284,7 +309,7 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
             }
         }
         // 活跃时间
-        String activeTime = paginationRequest.getSearchParams().get("activeTime") == null ? "" : paginationRequest.getSearchParams().get("activeTime").toString();
+        String activeTime = memberPage.getActiveTime();
         if (StringUtil.isNotEmpty(activeTime)) {
             String[] dateTime = activeTime.split("~");
             if (dateTime.length == 2) {
@@ -293,7 +318,7 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
             }
         }
         // 会员有效期
-        String memberTime = paginationRequest.getSearchParams().get("memberTime") == null ? "" : paginationRequest.getSearchParams().get("memberTime").toString();
+        String memberTime = memberPage.getMemberTime();
         if (StringUtil.isNotEmpty(memberTime)) {
             String[] dateTime = memberTime.split("~");
             if (dateTime.length == 2) {
@@ -315,7 +340,7 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
                 }
             }
             if (userDto.getGradeId() != null) {
-                Integer mchId = StringUtil.isNotEmpty(merchantId) ? Integer.parseInt(merchantId) : 0;
+                Integer mchId = merchantId != null ? merchantId : 0;
                 MtUserGrade mtGrade = userGradeService.queryUserGradeById(mchId, userDto.getGradeId(), mtUser.getId());
                 if (mtGrade != null) {
                     userDto.setGradeName(mtGrade.getName());
@@ -329,7 +354,7 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
             dataList.add(userDto);
         }
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(memberPage.getPage(), memberPage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<UserDto> paginationResponse = new PaginationResponse(pageImpl, UserDto.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -396,6 +421,11 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
         Date time = new Date();
         mtUser.setCreateTime(time);
         mtUser.setUpdateTime(time);
+        if (mtUser.getStartTime() != null && mtUser.getEndTime() != null) {
+            if (mtUser.getEndTime().before(mtUser.getStartTime())) {
+                throw new BusinessCheckException("会员结束时间不能早于开始时间");
+            }
+        }
         mtUser.setStartTime(mtUser.getStartTime());
         mtUser.setEndTime(mtUser.getEndTime());
         if (mtUser.getIsStaff() == null) {
@@ -497,6 +527,15 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
         if (mtUser.getStoreId() == null || mtUser.getStoreId() <= 0) {
             mtUser.setStoreId(oldUserInfo.getStoreId());
         }
+        if (mtUser.getStartTime() != null && mtUser.getEndTime() != null) {
+            if (mtUser.getEndTime().before(mtUser.getStartTime())) {
+                throw new BusinessCheckException("会员结束时间不能早于开始时间");
+            }
+        }
+        // 完善资料标记，如果未显式传入则使用旧值
+        if (StringUtil.isEmpty(mtUser.getProfileCompleted())) {
+            mtUser.setProfileCompleted(oldUserInfo.getProfileCompleted());
+        }
         Boolean result = updateById(mtUser);
         if (result && mtUser.getGradeId() != null) {
             // 修改了会员等级，开卡赠礼
@@ -542,6 +581,7 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
         mtUser.setStoreId(0);
         mtUser.setSource(MemberSourceEnum.MOBILE_LOGIN.getKey());
         mtUser.setIp(ip);
+        mtUser.setIsStaff(YesOrNoEnum.NO.getKey());
         mtUserMapper.insert(mtUser);
         mtUser = queryMemberByMobile(merchantId, mobile);
 
@@ -559,7 +599,6 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
      *
      * @param  merchantId 商户ID
      * @param  mobile 手机号
-     * @throws BusinessCheckException
      * @return
      */
     @Override
@@ -599,11 +638,10 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
      * 根据会员ID获取会员信息
      *
      * @param  id 会员ID
-     * @throws BusinessCheckException
      * @return
      */
     @Override
-    public MtUser queryMemberById(Integer id) throws BusinessCheckException {
+    public MtUser queryMemberById(Integer id) {
         MtUser mtUser = mtUserMapper.selectById(id);
 
         if (mtUser != null) {
@@ -625,7 +663,11 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
                 if (userGradeId == null && initGrade != null) {
                     mtUser.setGradeId(initGrade.getId());
                     updateById(mtUser);
-                    openGiftService.openGift(mtUser.getId(), initGrade.getId(), false);
+                    try {
+                        openGiftService.openGift(mtUser.getId(), initGrade.getId(), false);
+                    } catch (Exception e) {
+                        logger.error("开卡赠礼失败，userId = {}, message = {}", mtUser.getId(), e.getMessage());
+                    }
                 } else {
                     // 会员等级不存在或已禁用、删除，就把会员等级置为初始等级
                     MtUserGrade myGrade = userGradeService.queryUserGradeById(mtUser.getMerchantId(), userGradeId, id);
@@ -634,6 +676,9 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
                         updateById(mtUser);
                     }
                 }
+            }
+            if (mtUser.getIsStaff() == null) {
+                mtUser.setIsStaff(YesOrNoEnum.NO.getKey());
             }
         }
         return mtUser;
@@ -644,7 +689,6 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
      *
      * @param  merchantId 商户ID
      * @param  name 会员名称
-     * @throws BusinessCheckException
      * @return
      */
     @Override
@@ -797,7 +841,6 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
      * 根据等级ID获取会员等级信息
      *
      * @param  id 等级ID
-     * @throws BusinessCheckException
      * @return
      */
     @Override
@@ -809,16 +852,19 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
      * 删除会员
      *
      * @param  id 会员ID
-     * @param  operator 操作人
+     * @param  accountInfo 操作人
      * @throws BusinessCheckException
      * @return
      */
     @Override
     @OperationServiceLog(description = "删除会员信息")
-    public Integer deleteMember(Integer id, String operator) throws BusinessCheckException {
+    public Integer deleteMember(Integer id, AccountInfo accountInfo) throws BusinessCheckException {
         MtUser mtUser = mtUserMapper.selectById(id);
         if (null == mtUser) {
             throw new BusinessCheckException("该会员不存在，请确认");
+        }
+        if (accountInfo.getMerchantId() > 0 && !mtUser.getMerchantId().equals(accountInfo.getMerchantId())) {
+            throw new BusinessCheckException("不同商户，没有操作权限");
         }
         // 是否是店铺员工
         MtStaff mtStaff = staffService.queryStaffByUserId(id);
@@ -827,7 +873,7 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
         }
         mtUser.setStatus(StatusEnum.DISABLE.getKey());
         mtUser.setUpdateTime(new Date());
-        mtUser.setOperator(operator);
+        mtUser.setOperator(accountInfo.getAccountName());
         updateById(mtUser);
         return mtUser.getId();
     }
@@ -1007,7 +1053,7 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
      */
     @Override
     public String enCodePassword(String password, String salt) {
-        return MD5Util.getMD5(password + salt);
+        return SHAUtil.sha256(password + salt);
     }
 
     /**
@@ -1019,7 +1065,30 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
      * */
     @Override
     public String deCodePassword(String password, String salt) {
-        return MD5Util.getMD5(password + salt);
+        return SHAUtil.sha256(password + salt);
+    }
+
+    /**
+     * 验证密码（兼容旧 MD5 格式密码）
+     *
+     * @param rawPassword 明文密码
+     * @param storedHash  数据库存储的密码哈希
+     * @param salt        加密盐值
+     * @return 是否验证通过
+     */
+    @Override
+    public boolean verifyPassword(String rawPassword, String storedHash, String salt) {
+        if (storedHash == null || rawPassword == null) {
+            return false;
+        }
+        // 优先 SHA-256 验证
+        String sha256Hash = SHAUtil.sha256(rawPassword + salt);
+        if (sha256Hash != null && sha256Hash.equals(storedHash)) {
+            return true;
+        }
+        // 回退 MD5 兼容历史数据
+        String md5Hash = MD5Util.getMD5(rawPassword + salt);
+        return md5Hash != null && md5Hash.equals(storedHash);
     }
 
     /**
@@ -1075,7 +1144,7 @@ public class MemberServiceImpl extends ServiceImpl<MtUserMapper, MtUser> impleme
             }
             // 先校验，是否已存在，是否为空，是否重复
             List<MtUser> userList = new ArrayList<>();
-            List<MtUserGrade> userGrades = userGradeService.getMerchantGradeList(accountInfo.getMerchantId());
+            List<MtUserGrade> userGrades = userGradeService.getMerchantGradeList(accountInfo.getMerchantId(), null);
             for (int i = 0; i < memberList.size(); i++) {
                  List<String> userInfo = memberList.get(i);
                  String username = userInfo.get(0);

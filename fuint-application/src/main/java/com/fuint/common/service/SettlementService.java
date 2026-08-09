@@ -1,8 +1,9 @@
 package com.fuint.common.service;
 
-import com.fuint.common.dto.SettlementDto;
+import com.fuint.common.dto.order.SettlementDto;
+import com.fuint.common.dto.system.AccountInfo;
+import com.fuint.common.param.SettlementPage;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.module.backendApi.request.SettlementRequest;
 import com.fuint.repository.model.MtSettlement;
@@ -18,10 +19,10 @@ public interface SettlementService {
     /**
      * 分页查询结算列表
      *
-     * @param paginationRequest
+     * @param settlementPage
      * @return
      */
-    PaginationResponse<MtSettlement> querySettlementListByPagination(PaginationRequest paginationRequest) throws BusinessCheckException;
+    PaginationResponse<MtSettlement> querySettlementListByPagination(SettlementPage settlementPage);
 
     /**
      * 提交结算
@@ -36,11 +37,11 @@ public interface SettlementService {
      * 结算确认
      *
      * @param  settlementId
-     * @param  operator
+     * @param  accountInfo
      * @throws BusinessCheckException
      * @return
      */
-    Boolean doConfirm(Integer settlementId, String operator) throws BusinessCheckException;
+    Boolean doConfirm(Integer settlementId, AccountInfo accountInfo) throws BusinessCheckException;
 
     /**
      * 获取结算详情

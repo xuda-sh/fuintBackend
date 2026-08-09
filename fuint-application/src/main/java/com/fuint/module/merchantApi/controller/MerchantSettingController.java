@@ -1,8 +1,9 @@
 package com.fuint.module.merchantApi.controller;
 
-import com.fuint.common.dto.MerchantSettingDto;
-import com.fuint.common.dto.StaffDto;
-import com.fuint.common.dto.UserInfo;
+import com.fuint.common.dto.member.UserInfo;
+import com.fuint.common.dto.merchant.MerchantSettingDto;
+import com.fuint.common.dto.merchant.StaffDto;
+import com.fuint.common.dto.system.AccountInfo;
 import com.fuint.common.service.MemberService;
 import com.fuint.common.service.MerchantService;
 import com.fuint.common.service.SettingService;
@@ -17,7 +18,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-import javax.servlet.http.HttpServletRequest;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -59,8 +60,8 @@ public class MerchantSettingController extends BaseController {
     @ApiOperation(value = "查询商户设置信息")
     @RequestMapping(value = "/settingInfo", method = RequestMethod.GET)
     @CrossOrigin
-    public ResponseObject settingInfo(HttpServletRequest request) throws BusinessCheckException {
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+    public ResponseObject settingInfo() {
+        UserInfo userInfo = TokenUtil.getUserInfo();
         MtUser mtUser = memberService.queryMemberById(userInfo.getId());
         StaffDto staffInfo = staffService.getStaffInfoByMobile(mtUser.getMobile());
         if (null == staffInfo) {
@@ -79,8 +80,8 @@ public class MerchantSettingController extends BaseController {
     @ApiOperation(value = "保存商户设置")
     @RequestMapping(value = "/saveSetting", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject saveSetting(HttpServletRequest request, @RequestBody MerchantSettingParam params) throws BusinessCheckException {
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+    public ResponseObject saveSetting(@RequestBody MerchantSettingParam params) throws BusinessCheckException {
+        UserInfo userInfo = TokenUtil.getUserInfo();
         MtUser mtUser = memberService.queryMemberById(userInfo.getId());
         StaffDto staffInfo = staffService.getStaffInfoByMobile(mtUser.getMobile());
         if (null == staffInfo) {
@@ -88,7 +89,10 @@ public class MerchantSettingController extends BaseController {
         }
         params.setMerchantId(staffInfo.getMerchantId());
         params.setStoreId(staffInfo.getStoreId());
-        MerchantSettingDto merchantInfo = merchantService.saveMerchantSetting(params);
+        AccountInfo accountInfo = new AccountInfo();
+        accountInfo.setMerchantId(staffInfo.getMerchantId());
+        accountInfo.setAccountName(staffInfo.getRealName());
+        MerchantSettingDto merchantInfo = merchantService.saveMerchantSetting(params, accountInfo);
         return getSuccessResult(merchantInfo);
     }
 }

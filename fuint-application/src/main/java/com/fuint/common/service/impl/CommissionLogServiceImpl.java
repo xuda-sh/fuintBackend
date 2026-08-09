@@ -3,30 +3,33 @@ package com.fuint.common.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fuint.common.dto.CommissionLogDto;
-import com.fuint.common.dto.OrderUserDto;
+import com.fuint.common.dto.commission.CommissionLogDto;
+import com.fuint.common.dto.commission.CommissionOverviewDto;
+import com.fuint.common.dto.order.OrderUserDto;
 import com.fuint.common.enums.*;
+import com.fuint.common.param.CommissionLogPage;
 import com.fuint.common.service.*;
 import com.fuint.common.util.CommonUtil;
 import com.fuint.framework.annoation.OperationServiceLog;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.module.backendApi.request.CommissionLogRequest;
 import com.fuint.repository.mapper.*;
 import com.fuint.repository.model.*;
 import com.fuint.utils.StringUtil;
+import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import lombok.AllArgsConstructor;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.github.pagehelper.Page;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -37,7 +40,7 @@ import java.util.*;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class CommissionLogServiceImpl extends ServiceImpl<MtCommissionLogMapper, MtCommissionLog> implements CommissionLogService {
 
     private static final Logger logger = LoggerFactory.getLogger(CommissionLogServiceImpl.class);
@@ -78,20 +81,25 @@ public class CommissionLogServiceImpl extends ServiceImpl<MtCommissionLogMapper,
     private CommissionRuleService commissionRuleService;
 
     /**
+     * 提现记录 Mapper
+     * */
+    private MtCommissionCashMapper mtCommissionCashMapper;
+
+    /**
      * 分页查询分销提成列表
      *
-     * @param paginationRequest
+     * @param commissionLogPage
      * @return
      */
     @Override
-    public PaginationResponse<CommissionLogDto> queryCommissionLogByPagination(PaginationRequest paginationRequest) throws BusinessCheckException {
+    public PaginationResponse<CommissionLogDto> queryCommissionLogByPagination(CommissionLogPage commissionLogPage) {
         LambdaQueryWrapper<MtCommissionLog> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtCommissionLog::getStatus, StatusEnum.DISABLE.getKey());
-        String target = paginationRequest.getSearchParams().get("target") == null ? "" : paginationRequest.getSearchParams().get("target").toString();
+        String target = commissionLogPage.getTarget();
         if (StringUtils.isNotBlank(target)) {
             lambdaQueryWrapper.eq(MtCommissionLog::getTarget, target);
         }
-        String realName = paginationRequest.getSearchParams().get("realName") == null ? "" : paginationRequest.getSearchParams().get("realName").toString();
+        String realName = commissionLogPage.getRealName();
         if (StringUtils.isNotBlank(realName)) {
             Map<String, Object> params = new HashMap<>();
             params.put("REAL_NAME", realName);
@@ -103,7 +111,7 @@ public class CommissionLogServiceImpl extends ServiceImpl<MtCommissionLogMapper,
                 lambdaQueryWrapper.eq(MtCommissionLog::getStaffId, -1);
             }
         }
-        String mobile = paginationRequest.getSearchParams().get("mobile") == null ? "" : paginationRequest.getSearchParams().get("mobile").toString();
+        String mobile = commissionLogPage.getMobile();
         if (StringUtils.isNotBlank(mobile)) {
             MtStaff mtStaff = staffService.queryStaffByMobile(mobile);
             if (mtStaff != null) {
@@ -112,25 +120,29 @@ public class CommissionLogServiceImpl extends ServiceImpl<MtCommissionLogMapper,
                 lambdaQueryWrapper.eq(MtCommissionLog::getStaffId, -1);
             }
         }
-        String uuid = paginationRequest.getSearchParams().get("uuid") == null ? "" : paginationRequest.getSearchParams().get("uuid").toString();
+        String uuid = commissionLogPage.getUuid();
         if (StringUtils.isNotBlank(uuid)) {
             lambdaQueryWrapper.eq(MtCommissionLog::getSettleUuid, uuid);
         }
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = commissionLogPage.getStatus();
         if (StringUtils.isNotBlank(status)) {
             lambdaQueryWrapper.eq(MtCommissionLog::getStatus, status);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = commissionLogPage.getMerchantId();
+        if (merchantId != null && merchantId > 0) {
             lambdaQueryWrapper.eq(MtCommissionLog::getMerchantId, merchantId);
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotBlank(storeId)) {
+        Integer storeId = commissionLogPage.getStoreId();
+        if (storeId != null && storeId > 0) {
             lambdaQueryWrapper.eq(MtCommissionLog::getStoreId, storeId);
         }
+        Integer userId = commissionLogPage.getUserId();
+        if (userId != null && userId > 0) {
+            lambdaQueryWrapper.eq(MtCommissionLog::getUserId, userId);
+        }
         // 开始时间、结束时间
-        String startTime = paginationRequest.getSearchParams().get("startTime") == null ? "" : paginationRequest.getSearchParams().get("startTime").toString();
-        String endTime = paginationRequest.getSearchParams().get("endTime") == null ? "" : paginationRequest.getSearchParams().get("endTime").toString();
+        String startTime = commissionLogPage.getStartTime();
+        String endTime = commissionLogPage.getEndTime();
         if (StringUtil.isNotEmpty(startTime)) {
             lambdaQueryWrapper.ge(MtCommissionLog::getCreateTime, startTime);
         }
@@ -139,7 +151,7 @@ public class CommissionLogServiceImpl extends ServiceImpl<MtCommissionLogMapper,
         }
 
         lambdaQueryWrapper.orderByDesc(MtCommissionLog::getId);
-        Page<MtCommissionLog> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        Page<MtCommissionLog> pageHelper = PageHelper.startPage(commissionLogPage.getPage(), commissionLogPage.getPageSize());
         List<MtCommissionLog> commissionLogList = mtCommissionLogMapper.selectList(lambdaQueryWrapper);
         List<CommissionLogDto> dataList = new ArrayList<>();
         if (commissionLogList != null && commissionLogList.size() > 0) {
@@ -174,7 +186,7 @@ public class CommissionLogServiceImpl extends ServiceImpl<MtCommissionLogMapper,
                  dataList.add(commissionLogDto);
             }
         }
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(commissionLogPage.getPage(), commissionLogPage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<CommissionLogDto> paginationResponse = new PaginationResponse(pageImpl, CommissionLogDto.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -182,6 +194,38 @@ public class CommissionLogServiceImpl extends ServiceImpl<MtCommissionLogMapper,
         paginationResponse.setContent(dataList);
 
         return paginationResponse;
+    }
+
+    /**
+     * 获取佣金概览数据
+     *
+     * @param userId 会员ID
+     * @return
+     */
+    @Override
+    public CommissionOverviewDto getCommissionOverview(Integer userId) {
+        CommissionOverviewDto overviewDto = new CommissionOverviewDto();
+
+        // 总佣金（待结算佣金）
+        BigDecimal totalAmount = mtCommissionLogMapper.getTotalCommissionAmount(userId);
+        overviewDto.setTotalAmount(totalAmount != null ? totalAmount : BigDecimal.ZERO);
+
+        // 已提现金额
+        BigDecimal withdrawAmount = mtCommissionCashMapper.getWithdrawAmount(userId);
+        overviewDto.setWithdrawAmount(withdrawAmount != null ? withdrawAmount : BigDecimal.ZERO);
+
+        // 待提现金额 = 总佣金 - 已提现金额
+        overviewDto.setAmount(overviewDto.getTotalAmount().subtract(overviewDto.getWithdrawAmount()));
+
+        // 邀请会员数
+        Long userCount = mtCommissionRelationMapper.getInvitedUserCount(userId);
+        overviewDto.setUserCount(userCount != null ? new BigDecimal(userCount) : BigDecimal.ZERO);
+
+        // 订单数
+        Long orderCount = mtCommissionLogMapper.getCommissionOrderCount(userId);
+        overviewDto.setOrderCount(orderCount != null ? new BigDecimal(orderCount) : BigDecimal.ZERO);
+
+        return overviewDto;
     }
 
     /**
@@ -193,15 +237,22 @@ public class CommissionLogServiceImpl extends ServiceImpl<MtCommissionLogMapper,
     @Override
     @Transactional
     @OperationServiceLog(description = "计算订单分销提成")
-    public void calculateCommission(Integer orderId) throws BusinessCheckException {
+    public void calculateCommission(Integer orderId) {
         if (orderId != null && orderId > 0) {
             MtOrder mtOrder = orderService.getById(orderId);
-            // 获取邀请关系
+            // 获取一级邀请关系
             Integer commissionUserId = mtCommissionRelationMapper.getCommissionUserId(mtOrder.getMerchantId(), mtOrder.getUserId());
             if (commissionUserId != null && commissionUserId > 0) {
                 mtOrder.setCommissionUserId(commissionUserId);
                 orderService.updateOrder(mtOrder);
             }
+            // 获取二级邀请关系
+            Integer secondLevelUserId = mtCommissionRelationMapper.getSecondLevelCommissionUserId(mtOrder.getMerchantId(), mtOrder.getUserId());
+
+            // 判断是否为散客订单
+            boolean isVisitorOrder = mtOrder.getStaffId() != null && mtOrder.getStaffId() > 0
+                    && YesOrNoEnum.YES.getKey().equals(mtOrder.getIsVisitor());
+
             // 商品订单佣金计算
             if (mtOrder != null && mtOrder.getType().equals(CommissionTypeEnum.GOODS.getKey())) {
                 Map<String, Object> params = new HashMap<>();
@@ -216,16 +267,23 @@ public class CommissionLogServiceImpl extends ServiceImpl<MtCommissionLogMapper,
                                   MtCommissionRule mtCommissionRule = mtCommissionRuleMapper.selectById(mtCommissionRuleItem.getRuleId());
                                   // 规则状态正常
                                   if (mtCommissionRule != null && mtCommissionRule.getStatus().equals(StatusEnum.ENABLED.getKey())) {
-                                     // 分佣金额计算，散客和会员佣金比例不同
-                                     BigDecimal rate = mtCommissionRuleItem.getMember();
-                                     if (mtOrder.getStaffId() != null && mtOrder.getStaffId() > 0 && mtOrder.getIsVisitor().equals(YesOrNoEnum.YES.getKey())) {
-                                         rate = mtCommissionRuleItem.getGuest();
-                                     }
                                      if (orderGoods.getNum() == null || orderGoods.getNum() < 1) {
                                          orderGoods.setNum(1d);
                                      }
+                                     // 一级分佣
+                                     BigDecimal rate = isVisitorOrder ? mtCommissionRuleItem.getGuest() : mtCommissionRuleItem.getMember();
                                      BigDecimal amount = orderGoods.getPrice().multiply(rate.divide(new BigDecimal("100"))).multiply(new BigDecimal(orderGoods.getNum()));
-                                     addCommissionLog(mtOrder, mtCommissionRule, amount, mtCommissionRuleItem, mtOrder.getCommissionUserId());
+                                     addCommissionLog(mtOrder, mtCommissionRule, amount, mtCommissionRuleItem, mtOrder.getCommissionUserId(), 1);
+
+                                     // 二级分佣（仅会员分销，且二级邀请关系存在）
+                                     if (secondLevelUserId != null && secondLevelUserId > 0
+                                             && CommissionTargetEnum.MEMBER.getKey().equals(mtCommissionRule.getTarget())) {
+                                         BigDecimal secondRate = isVisitorOrder ? mtCommissionRuleItem.getSubGuest() : mtCommissionRuleItem.getSubMember();
+                                         if (secondRate != null && secondRate.compareTo(BigDecimal.ZERO) > 0) {
+                                             BigDecimal secondAmount = orderGoods.getPrice().multiply(secondRate.divide(new BigDecimal("100"))).multiply(new BigDecimal(orderGoods.getNum()));
+                                             addCommissionLog(mtOrder, mtCommissionRule, secondAmount, mtCommissionRuleItem, secondLevelUserId, 2);
+                                         }
+                                     }
                                   }
                              }
                          }
@@ -239,13 +297,20 @@ public class CommissionLogServiceImpl extends ServiceImpl<MtCommissionLogMapper,
                 if (commissionRuleItemList != null && commissionRuleItemList.size() > 0) {
                     for (MtCommissionRuleItem mtCommissionRuleItem : commissionRuleItemList) {
                          MtCommissionRule mtCommissionRule = mtCommissionRuleMapper.selectById(mtCommissionRuleItem.getRuleId());
-                         // 分佣金额计算，散客和会员佣金比例不同
-                         BigDecimal rate = mtCommissionRuleItem.getMember();
-                         if (mtOrder.getStaffId() != null && mtOrder.getStaffId() > 0 && mtOrder.getIsVisitor().equals(YesOrNoEnum.YES.getKey())) {
-                             rate = mtCommissionRuleItem.getGuest();
-                         }
+                         // 一级分佣
+                         BigDecimal rate = isVisitorOrder ? mtCommissionRuleItem.getGuest() : mtCommissionRuleItem.getMember();
                          BigDecimal amount = mtOrder.getAmount().multiply(rate.divide(new BigDecimal("100")));
-                         addCommissionLog(mtOrder, mtCommissionRule, amount, mtCommissionRuleItem, mtOrder.getCommissionUserId());
+                         addCommissionLog(mtOrder, mtCommissionRule, amount, mtCommissionRuleItem, mtOrder.getCommissionUserId(), 1);
+
+                         // 二级分佣（仅会员分销，且二级邀请关系存在）
+                         if (secondLevelUserId != null && secondLevelUserId > 0
+                                 && CommissionTargetEnum.MEMBER.getKey().equals(mtCommissionRule.getTarget())) {
+                             BigDecimal secondRate = isVisitorOrder ? mtCommissionRuleItem.getSubGuest() : mtCommissionRuleItem.getSubMember();
+                             if (secondRate != null && secondRate.compareTo(BigDecimal.ZERO) > 0) {
+                                 BigDecimal secondAmount = mtOrder.getAmount().multiply(secondRate.divide(new BigDecimal("100")));
+                                 addCommissionLog(mtOrder, mtCommissionRule, secondAmount, mtCommissionRuleItem, secondLevelUserId, 2);
+                             }
+                         }
                     }
                 }
             }
@@ -256,13 +321,25 @@ public class CommissionLogServiceImpl extends ServiceImpl<MtCommissionLogMapper,
                 if (commissionRuleItemList != null && commissionRuleItemList.size() > 0) {
                     for (MtCommissionRuleItem mtCommissionRuleItem : commissionRuleItemList) {
                          MtCommissionRule mtCommissionRule = mtCommissionRuleMapper.selectById(mtCommissionRuleItem.getRuleId());
-                         // 分佣金额计算，散客和会员佣金比例不同
-                         BigDecimal rate = mtCommissionRuleItem.getMember();
-                         if (mtOrder.getStaffId() != null && mtOrder.getStaffId() > 0 && mtOrder.getIsVisitor().equals(YesOrNoEnum.YES.getKey())) {
-                             rate = mtCommissionRuleItem.getGuest();
-                         }
+                         // 一级分佣
+                         BigDecimal rate = isVisitorOrder ? mtCommissionRuleItem.getGuest() : mtCommissionRuleItem.getMember();
                          BigDecimal amount = mtOrder.getPayAmount().multiply(rate.divide(new BigDecimal("100")));
-                         addCommissionLog(mtOrder, mtCommissionRule, amount, mtCommissionRuleItem, mtOrder.getCommissionUserId());
+                         addCommissionLog(mtOrder, mtCommissionRule, amount, mtCommissionRuleItem, mtOrder.getCommissionUserId(), 1);
+
+                         // 二级分佣（仅会员分销，且二级邀请关系存在）
+                         if (secondLevelUserId != null && secondLevelUserId > 0
+                                 && CommissionTargetEnum.MEMBER.getKey().equals(mtCommissionRule.getTarget())) {
+                             BigDecimal secondRate = isVisitorOrder ? mtCommissionRuleItem.getSubGuest() : mtCommissionRuleItem.getSubMember();
+                             if (secondRate != null && secondRate.compareTo(BigDecimal.ZERO) > 0) {
+                                 BigDecimal secondAmount;
+                                 if (mtOrder.getPayAmount() != null) {
+                                     secondAmount = mtOrder.getPayAmount().multiply(secondRate.divide(new BigDecimal("100")));
+                                 } else {
+                                     secondAmount = mtOrder.getAmount().multiply(secondRate.divide(new BigDecimal("100")));
+                                 }
+                                 addCommissionLog(mtOrder, mtCommissionRule, secondAmount, mtCommissionRuleItem, secondLevelUserId, 2);
+                             }
+                         }
                     }
                 }
             }
@@ -333,16 +410,17 @@ public class CommissionLogServiceImpl extends ServiceImpl<MtCommissionLogMapper,
      * @param amount 分佣金额
      * @param mtCommissionRuleItem 分佣规则
      * @param userId 会员ID
+     * @param level 分佣等级（1=一级，2=二级）
      * @return
      * */
     @Transactional
     @OperationServiceLog(description = "新增分销提成记录")
-    public void addCommissionLog(MtOrder mtOrder, MtCommissionRule mtCommissionRule, BigDecimal amount, MtCommissionRuleItem mtCommissionRuleItem, Integer userId) {
+    public void addCommissionLog(MtOrder mtOrder, MtCommissionRule mtCommissionRule, BigDecimal amount, MtCommissionRuleItem mtCommissionRuleItem, Integer userId, Integer level) {
         if (amount.compareTo(BigDecimal.ZERO) > 0) {
             MtCommissionLog mtCommissionLog = new MtCommissionLog();
             mtCommissionLog.setType(mtOrder.getType());
             mtCommissionLog.setTarget(mtCommissionRule.getTarget());
-            mtCommissionLog.setLevel(0);
+            mtCommissionLog.setLevel(level);
             mtCommissionLog.setOrderId(mtOrder.getId());
             mtCommissionLog.setMerchantId(mtOrder.getMerchantId());
             mtCommissionLog.setStoreId(mtOrder.getStoreId());

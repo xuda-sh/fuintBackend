@@ -4,13 +4,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
+import com.fuint.common.dto.system.AccountInfo;
+import com.fuint.common.param.BannerPage;
 import com.fuint.common.service.StoreService;
 import com.fuint.framework.annoation.OperationServiceLog;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.model.MtBanner;
-import com.fuint.common.dto.BannerDto;
+import com.fuint.common.dto.content.BannerDto;
 import com.fuint.common.service.BannerService;
 import com.fuint.common.service.SettingService;
 import com.fuint.common.enums.StatusEnum;
@@ -24,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.github.pagehelper.Page;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -37,7 +39,7 @@ import java.util.*;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class BannerServiceImpl extends ServiceImpl<MtBannerMapper, MtBanner> implements BannerService {
 
     private static final Logger logger = LoggerFactory.getLogger(BannerServiceImpl.class);
@@ -57,36 +59,36 @@ public class BannerServiceImpl extends ServiceImpl<MtBannerMapper, MtBanner> imp
     /**
      * 分页查询焦点图列表
      *
-     * @param paginationRequest
+     * @param bannerPage
      * @return
      */
     @Override
-    public PaginationResponse<MtBanner> queryBannerListByPagination(PaginationRequest paginationRequest) {
-        Page<MtBanner> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<MtBanner> queryBannerListByPagination(BannerPage bannerPage) {
+        Page<MtBanner> pageHelper = PageHelper.startPage(bannerPage.getPage(), bannerPage.getPageSize());
         LambdaQueryWrapper<MtBanner> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtBanner::getStatus, StatusEnum.DISABLE.getKey());
 
-        String title = paginationRequest.getSearchParams().get("title") == null ? "" : paginationRequest.getSearchParams().get("title").toString();
+        String title = bannerPage.getTitle();
         if (StringUtils.isNotBlank(title)) {
             lambdaQueryWrapper.like(MtBanner::getTitle, title);
         }
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = bannerPage.getStatus();
         if (StringUtils.isNotBlank(status)) {
             lambdaQueryWrapper.eq(MtBanner::getStatus, status);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = bannerPage.getMerchantId();
+        if (merchantId != null) {
             lambdaQueryWrapper.eq(MtBanner::getMerchantId, merchantId);
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotBlank(storeId)) {
+        Integer storeId = bannerPage.getStoreId();
+        if (storeId != null) {
             lambdaQueryWrapper.eq(MtBanner::getStoreId, storeId);
         }
 
         lambdaQueryWrapper.orderByAsc(MtBanner::getSort);
         List<MtBanner> dataList = mtBannerMapper.selectList(lambdaQueryWrapper);
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(bannerPage.getPage(), bannerPage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<MtBanner> paginationResponse = new PaginationResponse(pageImpl, MtBanner.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -117,9 +119,6 @@ public class BannerServiceImpl extends ServiceImpl<MtBannerMapper, MtBanner> imp
         if (mtBanner.getMerchantId() == null || mtBanner.getMerchantId() <= 0) {
             throw new BusinessCheckException("新增焦点图失败：所属商户不能为空！");
         }
-        if (mtBanner.getMerchantId() == null || mtBanner.getMerchantId() < 1) {
-            throw new BusinessCheckException("平台方帐号无法执行该操作，请使用商户帐号操作");
-        }
         mtBanner.setStoreId(storeId);
         mtBanner.setStatus(StatusEnum.ENABLED.getKey());
         mtBanner.setUpdateTime(new Date());
@@ -145,41 +144,24 @@ public class BannerServiceImpl extends ServiceImpl<MtBannerMapper, MtBanner> imp
     }
 
     /**
-     * 根据ID删除Banner图
+     * 修改焦点图
      *
-     * @param id BannerID
-     * @param operator 操作人
-     * @return
-     */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    @OperationServiceLog(description = "删除Banner图")
-    public void deleteBanner(Integer id, String operator) {
-        MtBanner mtBanner = queryBannerById(id);
-        if (null == mtBanner) {
-            return;
-        }
-        mtBanner.setStatus(StatusEnum.DISABLE.getKey());
-        mtBanner.setUpdateTime(new Date());
-        mtBannerMapper.updateById(mtBanner);
-    }
-
-    /**
-     * 修改Banner图
-     *
-     * @param bannerDto
+     * @param  bannerDto
+     * @param  accountInfo
      * @throws BusinessCheckException
      * @return
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @OperationServiceLog(description = "更新焦点图")
-    public MtBanner updateBanner(BannerDto bannerDto) throws BusinessCheckException {
+    public MtBanner updateBanner(BannerDto bannerDto, AccountInfo accountInfo) throws BusinessCheckException {
         MtBanner mtBanner = queryBannerById(bannerDto.getId());
         if (mtBanner == null) {
-            throw new BusinessCheckException("该Banner状态异常");
+            throw new BusinessCheckException("数据不存在");
         }
-
+        if (mtBanner.getMerchantId() != accountInfo.getMerchantId()) {
+            throw new BusinessCheckException("不同商户，无权限操作");
+        }
         mtBanner.setId(bannerDto.getId());
         if (bannerDto.getImage() != null) {
             mtBanner.setImage(bannerDto.getImage());
@@ -213,8 +195,7 @@ public class BannerServiceImpl extends ServiceImpl<MtBannerMapper, MtBanner> imp
     /**
      * 根据条件搜索焦点图
      *
-     * @param params 查询参数
-     * @throws BusinessCheckException
+     * @param  params 查询参数
      * @return
      * */
     @Override

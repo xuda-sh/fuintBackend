@@ -1,7 +1,9 @@
 package com.fuint.module.clientApi.controller;
 
 import com.alipay.api.AlipayApiException;
-import com.fuint.common.dto.*;
+import com.fuint.common.dto.coupon.CouponDto;
+import com.fuint.common.dto.member.UserInfo;
+import com.fuint.common.dto.order.UserOrderDto;
 import com.fuint.common.enums.OrderStatusEnum;
 import com.fuint.common.enums.SettingTypeEnum;
 import com.fuint.common.enums.YesOrNoEnum;
@@ -10,7 +12,9 @@ import com.fuint.common.util.TokenUtil;
 import com.fuint.framework.exception.BusinessCheckException;
 import com.fuint.framework.web.BaseController;
 import com.fuint.framework.web.ResponseObject;
-import com.fuint.repository.model.*;
+import com.fuint.repository.model.MtSetting;
+import com.fuint.repository.model.MtUser;
+import com.fuint.repository.model.MtUserGrade;
 import com.fuint.utils.StringUtil;
 import com.ijpay.alipay.AliPayApi;
 import com.ijpay.core.kit.HttpKit;
@@ -19,12 +23,13 @@ import com.ijpay.wxpay.WxPayApiConfigKit;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
-import org.springframework.util.CollectionUtils;
-import org.springframework.web.bind.annotation.*;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.bind.annotation.*;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
@@ -95,11 +100,11 @@ public class ClientPayController extends BaseController {
     @ApiOperation(value = "支付前查询")
     @RequestMapping(value = "/prePay", method = RequestMethod.GET)
     @CrossOrigin
-    public ResponseObject prePay(HttpServletRequest request) throws BusinessCheckException {
+    public ResponseObject prePay(HttpServletRequest request) {
         Integer storeId = StringUtil.isEmpty(request.getHeader("storeId")) ? 0 : Integer.parseInt(request.getHeader("storeId"));
         String useFor = request.getParameter("type") == null ? "" : request.getParameter("type");
         String merchantNo = request.getHeader("merchantNo");
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo userInfo = TokenUtil.getUserInfo();
 
         MtUser mtUser = memberService.queryMemberById(userInfo.getId());
         Map<String, Object> outParams = new HashMap<>();

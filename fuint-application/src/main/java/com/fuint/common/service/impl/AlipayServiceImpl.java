@@ -9,8 +9,8 @@ import com.alipay.api.response.AlipayTradePayResponse;
 import com.alipay.api.response.AlipayTradeQueryResponse;
 import com.alipay.api.response.AlipayTradeRefundResponse;
 import com.fuint.common.bean.AliPayBean;
-import com.fuint.common.dto.OrderDto;
-import com.fuint.common.dto.UserOrderDto;
+import com.fuint.common.dto.order.OrderDto;
+import com.fuint.common.dto.order.UserOrderDto;
 import com.fuint.common.enums.*;
 import com.fuint.common.service.*;
 import com.fuint.framework.exception.BusinessCheckException;
@@ -23,6 +23,7 @@ import com.ijpay.alipay.AliPayApiConfigKit;
 import lombok.AllArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -35,7 +36,7 @@ import java.util.*;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class AlipayServiceImpl implements AlipayService {
 
     private static final Logger logger = LoggerFactory.getLogger(AlipayServiceImpl.class);

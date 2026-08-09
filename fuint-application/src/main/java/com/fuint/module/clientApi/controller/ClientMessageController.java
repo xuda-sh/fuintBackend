@@ -1,13 +1,12 @@
 package com.fuint.module.clientApi.controller;
 
 import com.alibaba.fastjson.JSONObject;
-import com.fuint.common.dto.UserInfo;
+import com.fuint.common.dto.member.UserInfo;
 import com.fuint.common.enums.SettingTypeEnum;
 import com.fuint.common.service.MerchantService;
 import com.fuint.common.service.MessageService;
 import com.fuint.common.service.SettingService;
 import com.fuint.common.util.TokenUtil;
-import com.fuint.framework.exception.BusinessCheckException;
 import com.fuint.framework.web.BaseController;
 import com.fuint.framework.web.ResponseObject;
 import com.fuint.repository.model.MtMessage;
@@ -16,9 +15,16 @@ import com.fuint.utils.StringUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RestController;
+
 import javax.servlet.http.HttpServletRequest;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 消息相关controller
@@ -53,8 +59,8 @@ public class ClientMessageController extends BaseController {
     @ApiOperation(value = "查询最新一条未读消息")
     @RequestMapping(value = "/getOne", method = RequestMethod.GET)
     @CrossOrigin
-    public ResponseObject getOne(HttpServletRequest request) throws BusinessCheckException {
-        UserInfo mtUser = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+    public ResponseObject getOne() {
+        UserInfo mtUser = TokenUtil.getUserInfo();
         if (null == mtUser) {
             return getSuccessResult(false);
         }
@@ -78,8 +84,8 @@ public class ClientMessageController extends BaseController {
     @ApiOperation(value = "将消息置为已读")
     @RequestMapping(value = "/readed", method = RequestMethod.GET)
     @CrossOrigin
-    public ResponseObject readed(HttpServletRequest request) throws BusinessCheckException {
-        UserInfo mtUser = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+    public ResponseObject setRead(HttpServletRequest request) {
+        UserInfo mtUser = TokenUtil.getUserInfo();
 
         Integer msgId =  request.getParameter("msgId") == null ? 0 :Integer.parseInt(request.getParameter("msgId"));
 
@@ -115,9 +121,9 @@ public class ClientMessageController extends BaseController {
     @ApiOperation(value = "微信订阅消息模板")
     @RequestMapping(value = "/getSubTemplate", method = RequestMethod.GET)
     @CrossOrigin
-    public ResponseObject getSubTemplate(HttpServletRequest request) throws BusinessCheckException {
+    public ResponseObject getSubTemplate(HttpServletRequest request) {
         String merchantNo = request.getHeader("merchantNo");
-        String keys =  request.getParameter("keys") == null ? "" :request.getParameter("keys");
+        String keys = request.getParameter("keys") == null ? "" :request.getParameter("keys");
 
         List<String> dataList = new ArrayList<>();
         Integer merchantId = merchantService.getMerchantId(merchantNo);

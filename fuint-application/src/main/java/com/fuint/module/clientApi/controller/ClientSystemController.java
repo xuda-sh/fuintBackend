@@ -1,8 +1,8 @@
 package com.fuint.module.clientApi.controller;
 
-import com.fuint.common.dto.ParamDto;
-import com.fuint.common.dto.StoreInfo;
-import com.fuint.common.dto.UserInfo;
+import com.fuint.common.dto.common.ParamDto;
+import com.fuint.common.dto.member.UserInfo;
+import com.fuint.common.dto.merchant.StoreInfo;
 import com.fuint.common.enums.StatusEnum;
 import com.fuint.common.enums.YesOrNoEnum;
 import com.fuint.common.service.MemberService;
@@ -21,7 +21,11 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RestController;
+
 import javax.servlet.http.HttpServletRequest;
 import java.util.Date;
 import java.util.HashMap;
@@ -73,7 +77,7 @@ public class ClientSystemController extends BaseController {
         String latitude = request.getHeader("latitude") == null ? "" : request.getHeader("latitude");
         String longitude = request.getHeader("longitude") == null ? "" : request.getHeader("longitude");
 
-        UserInfo loginInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo loginInfo = TokenUtil.getUserInfo();
         Integer merchantId = merchantService.getMerchantId(merchantNo);
 
         // 默认店铺，取会员之前选择的店铺

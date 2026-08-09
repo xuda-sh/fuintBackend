@@ -9,6 +9,7 @@ import com.fuint.repository.mapper.MtMessageMapper;
 import com.fuint.repository.model.MtMessage;
 import com.fuint.utils.StringUtil;
 import lombok.AllArgsConstructor;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Date;
@@ -21,10 +22,10 @@ import java.util.List;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class MessageServiceImpl extends ServiceImpl<MtMessageMapper, MtMessage> implements MessageService {
 
-    private MtMessageMapper messageRepository;
+    private MtMessageMapper mtMessageMapper;
 
     /**
      * 添加消息
@@ -60,7 +61,7 @@ public class MessageServiceImpl extends ServiceImpl<MtMessageMapper, MtMessage> 
             return;
         }
 
-        MtMessage mtMsg = messageRepository.selectById(msgId);
+        MtMessage mtMsg = mtMessageMapper.selectById(msgId);
         if (mtMsg == null) {
             return;
         }
@@ -68,7 +69,7 @@ public class MessageServiceImpl extends ServiceImpl<MtMessageMapper, MtMessage> 
         mtMsg.setIsRead(YesOrNoEnum.YES.getKey());
         mtMsg.setUpdateTime(new Date());
 
-        messageRepository.updateById(mtMsg);
+        mtMessageMapper.updateById(mtMsg);
     }
 
     /**
@@ -84,7 +85,7 @@ public class MessageServiceImpl extends ServiceImpl<MtMessageMapper, MtMessage> 
             return;
         }
 
-        MtMessage mtMsg = messageRepository.selectById(msgId);
+        MtMessage mtMsg = mtMessageMapper.selectById(msgId);
         if (mtMsg == null) {
             return;
         }
@@ -99,8 +100,7 @@ public class MessageServiceImpl extends ServiceImpl<MtMessageMapper, MtMessage> 
         }
 
         mtMsg.setUpdateTime(new Date());
-
-        messageRepository.updateById(mtMsg);
+        mtMessageMapper.updateById(mtMsg);
     }
 
     /**
@@ -111,11 +111,10 @@ public class MessageServiceImpl extends ServiceImpl<MtMessageMapper, MtMessage> 
      */
     @Override
     public MtMessage getOne(Integer userId) {
-        List<MtMessage> messageList = messageRepository.findNewMessage(userId, MessageEnum.POP_MSG.getKey());
+        List<MtMessage> messageList = mtMessageMapper.findNewMessage(userId, MessageEnum.POP_MSG.getKey());
 
         if (messageList.size() > 0) {
-            MtMessage messageInfo = messageList.get(0);
-            return messageInfo;
+            return messageList.get(0);
         }
 
         return null;
@@ -128,7 +127,6 @@ public class MessageServiceImpl extends ServiceImpl<MtMessageMapper, MtMessage> 
      */
     @Override
     public List<MtMessage> getNeedSendList() {
-        List<MtMessage> messageList = messageRepository.findNeedSendMessage(MessageEnum.SUB_MSG.getKey());
-        return messageList;
+        return mtMessageMapper.findNeedSendMessage(MessageEnum.SUB_MSG.getKey());
     }
 }

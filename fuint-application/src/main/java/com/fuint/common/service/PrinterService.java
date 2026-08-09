@@ -1,8 +1,9 @@
 package com.fuint.common.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.fuint.common.dto.UserOrderDto;
-import com.fuint.framework.pagination.PaginationRequest;
+import com.fuint.common.dto.order.UserOrderDto;
+import com.fuint.common.dto.system.AccountInfo;
+import com.fuint.common.param.PrinterPage;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.model.MtPrinter;
 import com.fuint.framework.exception.BusinessCheckException;
@@ -20,10 +21,10 @@ public interface PrinterService extends IService<MtPrinter> {
     /**
      * 分页查询列表
      *
-     * @param paginationRequest
+     * @param printerPage
      * @return
      */
-    PaginationResponse<MtPrinter> queryPrinterListByPagination(PaginationRequest paginationRequest) throws BusinessCheckException;
+    PaginationResponse<MtPrinter> queryPrinterListByPagination(PrinterPage printerPage);
 
     /**
      * 添加打印机
@@ -47,10 +48,9 @@ public interface PrinterService extends IService<MtPrinter> {
      * 根据ID获取打印机信息
      *
      * @param id ID
-     * @throws BusinessCheckException
      * @return
      */
-    MtPrinter queryPrinterById(Integer id) throws BusinessCheckException;
+    MtPrinter queryPrinterById(Integer id);
 
     /**
      * 根据ID删除打印机
@@ -64,18 +64,19 @@ public interface PrinterService extends IService<MtPrinter> {
 
     /**
      * 更新打印机
+     *
      * @param  mtPrinter
+     * @param accountInfo
      * @throws BusinessCheckException
      * @return
      * */
-    MtPrinter updatePrinter(MtPrinter mtPrinter) throws BusinessCheckException;
+    MtPrinter updatePrinter(MtPrinter mtPrinter, AccountInfo accountInfo) throws BusinessCheckException;
 
     /**
      * 根据条件搜索打印机
      *
      * @param params 查询参数
-     * @throws BusinessCheckException
      * @return
      * */
-    List<MtPrinter> queryPrinterListByParams(Map<String, Object> params) throws BusinessCheckException;
+    List<MtPrinter> queryPrinterListByParams(Map<String, Object> params);
 }

@@ -4,6 +4,7 @@ import com.fuint.utils.ContextUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.util.CollectionUtils;
+
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
@@ -16,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class RedisUtil {
 
-    private static RedisTemplate<String, Object> redisTemplate = ContextUtils.getBean("redisTemplate", RedisTemplate.class);
+    private static final RedisTemplate<String, Object> redisTemplate = ContextUtils.getBean("redisTemplate", RedisTemplate.class);
 
     /**
      * 指定缓存失效时间
@@ -108,7 +109,7 @@ public class RedisUtil {
             }
             return true;
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Redis set操作异常", e);
             return false;
         }
     }

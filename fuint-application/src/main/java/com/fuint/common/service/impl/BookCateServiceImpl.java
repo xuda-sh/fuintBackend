@@ -3,29 +3,32 @@ package com.fuint.common.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fuint.common.enums.StatusEnum;
+import com.fuint.common.param.BookCatePage;
 import com.fuint.common.service.BookCateService;
+import com.fuint.common.service.SettingService;
 import com.fuint.common.service.StoreService;
 import com.fuint.framework.annoation.OperationServiceLog;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.mapper.MtBookCateMapper;
-import com.fuint.common.service.SettingService;
-import com.fuint.common.enums.StatusEnum;
 import com.fuint.repository.model.MtBookCate;
 import com.fuint.repository.model.MtStore;
 import com.fuint.utils.StringUtil;
+import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import lombok.AllArgsConstructor;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.github.pagehelper.Page;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.*;
+
+import java.util.Date;
+import java.util.List;
 
 /**
  * 预约分类服务接口
@@ -34,7 +37,7 @@ import java.util.*;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class BookCateServiceImpl extends ServiceImpl<MtBookCateMapper, MtBookCate> implements BookCateService {
 
     private static final Logger logger = LoggerFactory.getLogger(BookCateServiceImpl.class);
@@ -54,29 +57,29 @@ public class BookCateServiceImpl extends ServiceImpl<MtBookCateMapper, MtBookCat
     /**
      * 分页查询预约分类列表
      *
-     * @param paginationRequest
+     * @param bookCatePage
      * @return
      */
     @Override
-    public PaginationResponse<MtBookCate> queryBookCateListByPagination(PaginationRequest paginationRequest) {
-        Page<MtBookCate> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<MtBookCate> queryBookCateListByPagination(BookCatePage bookCatePage) {
+        Page<MtBookCate> pageHelper = PageHelper.startPage(bookCatePage.getPage(), bookCatePage.getPageSize());
         LambdaQueryWrapper<MtBookCate> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtBookCate::getStatus, StatusEnum.DISABLE.getKey());
 
-        String name = paginationRequest.getSearchParams().get("name") == null ? "" : paginationRequest.getSearchParams().get("name").toString();
+        String name = bookCatePage.getName();
         if (StringUtils.isNotBlank(name)) {
             lambdaQueryWrapper.like(MtBookCate::getName, name);
         }
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = bookCatePage.getStatus();
         if (StringUtils.isNotBlank(status)) {
             lambdaQueryWrapper.eq(MtBookCate::getStatus, status);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = bookCatePage.getMerchantId();
+        if (merchantId != null && merchantId > 0) {
             lambdaQueryWrapper.eq(MtBookCate::getMerchantId, merchantId);
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotBlank(storeId)) {
+        Integer storeId = bookCatePage.getStoreId();
+        if (storeId != null && storeId > 0) {
             lambdaQueryWrapper.and(wq -> wq
                     .eq(MtBookCate::getStoreId, 0)
                     .or()
@@ -86,7 +89,7 @@ public class BookCateServiceImpl extends ServiceImpl<MtBookCateMapper, MtBookCat
         lambdaQueryWrapper.orderByAsc(MtBookCate::getSort);
         List<MtBookCate> dataList = mtBookCateMapper.selectList(lambdaQueryWrapper);
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(bookCatePage.getPage(), bookCatePage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<MtBookCate> paginationResponse = new PaginationResponse(pageImpl, MtBookCate.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -197,47 +200,34 @@ public class BookCateServiceImpl extends ServiceImpl<MtBookCateMapper, MtBookCat
     }
 
     /**
-     * 根据条件搜索焦点图
+     * 获取可用的预约类别
      *
-     * @param params 查询参数
+     * @param  merchantId 商户ID
+     * @param  storeId 店铺ID
      * @throws BusinessCheckException
      * @return
      * */
     @Override
-    public List<MtBookCate> queryBookCateListByParams(Map<String, Object> params) {
-        String status =  params.get("status") == null ? StatusEnum.ENABLED.getKey(): params.get("status").toString();
-        String storeId =  params.get("storeId") == null ? "" : params.get("storeId").toString();
-        String merchantId =  params.get("merchantId") == null ? "" : params.get("merchantId").toString();
-        String name = params.get("name") == null ? "" : params.get("name").toString();
-
+    public List<MtBookCate> getAvailableBookCate(Integer merchantId, Integer storeId) {
         LambdaQueryWrapper<MtBookCate> lambdaQueryWrapper = Wrappers.lambdaQuery();
-        lambdaQueryWrapper.ne(MtBookCate::getStatus, StatusEnum.DISABLE.getKey());
-        if (StringUtils.isNotBlank(name)) {
-            lambdaQueryWrapper.like(MtBookCate::getName, name);
-        }
-        if (StringUtils.isNotBlank(status)) {
-            lambdaQueryWrapper.eq(MtBookCate::getStatus, status);
-        }
-        if (StringUtils.isNotBlank(merchantId)) {
+        lambdaQueryWrapper.eq(MtBookCate::getStatus, StatusEnum.ENABLED.getKey());
+        if (merchantId != null && merchantId > 0) {
             lambdaQueryWrapper.eq(MtBookCate::getMerchantId, merchantId);
         }
-        if (StringUtils.isNotBlank(storeId)) {
+        if (storeId != null && storeId > 0) {
             lambdaQueryWrapper.and(wq -> wq
                     .eq(MtBookCate::getStoreId, 0)
                     .or()
                     .eq(MtBookCate::getStoreId, storeId));
         }
-
         lambdaQueryWrapper.orderByAsc(MtBookCate::getSort);
         List<MtBookCate> dataList = mtBookCateMapper.selectList(lambdaQueryWrapper);
         String baseImage = settingService.getUploadBasePath();
-
         if (dataList.size() > 0) {
             for (MtBookCate mtBookCate : dataList) {
-                 mtBookCate.setLogo(baseImage + mtBookCate.getLogo());
+                mtBookCate.setLogo(baseImage + mtBookCate.getLogo());
             }
         }
-
         return dataList;
     }
 }

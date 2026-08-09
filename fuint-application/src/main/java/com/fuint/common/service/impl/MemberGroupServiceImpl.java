@@ -3,17 +3,21 @@ package com.fuint.common.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fuint.common.dto.MemberGroupDto;
-import com.fuint.common.dto.UserGroupDto;
+import com.fuint.common.dto.member.MemberGroupDto;
+import com.fuint.common.dto.member.UserGroupDto;
+import com.fuint.common.dto.system.AccountInfo;
 import com.fuint.common.enums.StatusEnum;
-import com.fuint.common.service.*;
+import com.fuint.common.param.MemberGroupPage;
+import com.fuint.common.service.MemberGroupService;
+import com.fuint.common.service.StoreService;
 import com.fuint.common.util.CommonUtil;
 import com.fuint.framework.annoation.OperationServiceLog;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.mapper.MtUserGroupMapper;
-import com.fuint.repository.model.*;
+import com.fuint.repository.model.MtCouponGroup;
+import com.fuint.repository.model.MtStore;
+import com.fuint.repository.model.MtUserGroup;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import lombok.AllArgsConstructor;
@@ -26,7 +30,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.lang.String;
+
 import java.util.*;
 
 /**
@@ -51,33 +55,33 @@ public class MemberGroupServiceImpl extends ServiceImpl<MtUserGroupMapper, MtUse
     /**
      * 分页查询会员分组列表
      *
-     * @param paginationRequest
+     * @param memberGroupPage
      * @return
      */
     @Override
-    public PaginationResponse<UserGroupDto> queryMemberGroupListByPagination(PaginationRequest paginationRequest) {
-        Page<MtCouponGroup> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<UserGroupDto> queryMemberGroupListByPagination(MemberGroupPage memberGroupPage) {
+        Page<MtCouponGroup> pageHelper = PageHelper.startPage(memberGroupPage.getPage(), memberGroupPage.getPageSize());
         LambdaQueryWrapper<MtUserGroup> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtUserGroup::getStatus, StatusEnum.DISABLE.getKey());
         lambdaQueryWrapper.eq(MtUserGroup::getParentId, 0);
-        String name = paginationRequest.getSearchParams().get("name") == null ? "" : paginationRequest.getSearchParams().get("name").toString();
+        String name = memberGroupPage.getName();
         if (StringUtils.isNotBlank(name)) {
             lambdaQueryWrapper.like(MtUserGroup::getName, name);
         }
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = memberGroupPage.getStatus();
         if (StringUtils.isNotBlank(status)) {
             lambdaQueryWrapper.eq(MtUserGroup::getStatus, status);
         }
-        String id = paginationRequest.getSearchParams().get("id") == null ? "" : paginationRequest.getSearchParams().get("id").toString();
-        if (StringUtils.isNotBlank(id)) {
+        Integer id = memberGroupPage.getId();
+        if (id != null) {
             lambdaQueryWrapper.eq(MtUserGroup::getId, id);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = memberGroupPage.getMerchantId();
+        if (merchantId != null) {
             lambdaQueryWrapper.eq(MtUserGroup::getMerchantId, merchantId);
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotBlank(storeId)) {
+        Integer storeId = memberGroupPage.getStoreId();
+        if (storeId != null) {
             lambdaQueryWrapper.eq(MtUserGroup::getStoreId, storeId);
         }
 
@@ -94,7 +98,7 @@ public class MemberGroupServiceImpl extends ServiceImpl<MtUserGroupMapper, MtUse
             }
         }
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(memberGroupPage.getPage(), memberGroupPage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<UserGroupDto> paginationResponse = new PaginationResponse(pageImpl, UserGroupDto.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -108,12 +112,11 @@ public class MemberGroupServiceImpl extends ServiceImpl<MtUserGroupMapper, MtUse
      * 添加会员分组
      *
      * @param  memberGroupDto 会员分组
-     * @throws BusinessCheckException
      * @return
      */
     @Override
     @OperationServiceLog(description = "新增会员分组")
-    public MtUserGroup addMemberGroup(MemberGroupDto memberGroupDto) throws BusinessCheckException {
+    public MtUserGroup addMemberGroup(MemberGroupDto memberGroupDto) {
         MtUserGroup userGroup = new MtUserGroup();
         Integer storeId = memberGroupDto.getStoreId() == null ? 0 : memberGroupDto.getStoreId();
         if (memberGroupDto.getMerchantId() == null || memberGroupDto.getMerchantId() <= 0) {
@@ -139,7 +142,6 @@ public class MemberGroupServiceImpl extends ServiceImpl<MtUserGroupMapper, MtUse
      * 根据分组ID获取分组信息
      *
      * @param  id 分组ID
-     * @throws BusinessCheckException
      * @return
      */
     @Override
@@ -150,22 +152,23 @@ public class MemberGroupServiceImpl extends ServiceImpl<MtUserGroupMapper, MtUse
     /**
      * 根据ID删除会员分组
      *
-     * @param  id       分组ID
-     * @param  operator 操作人
-     * @throws BusinessCheckException
+     * @param  id 分组ID
+     * @param  accountInfo 操作人
      * @return
      */
     @Override
     @OperationServiceLog(description = "删除会员分组")
-    public void deleteMemberGroup(Integer id, String operator) {
+    public void deleteMemberGroup(Integer id, AccountInfo accountInfo) throws BusinessCheckException {
         MtUserGroup userGroup = queryMemberGroupById(id);
         if (null == userGroup) {
-            return;
+            throw new BusinessCheckException("该分组不存在");
         }
-
+        if (accountInfo.getMerchantId() != null && !accountInfo.getMerchantId().equals(userGroup.getMerchantId())) {
+            throw new BusinessCheckException("不同商户，无操作权限");
+        }
         userGroup.setStatus(StatusEnum.DISABLE.getKey());
         userGroup.setUpdateTime(new Date());
-        userGroup.setOperator(operator);
+        userGroup.setOperator(accountInfo.getAccountName());
 
         this.updateById(userGroup);
     }
@@ -174,17 +177,21 @@ public class MemberGroupServiceImpl extends ServiceImpl<MtUserGroupMapper, MtUse
      * 修改会员分组
      *
      * @param  memberGroupDto
+     * @param  accountInfo
      * @throws BusinessCheckException
      * @return
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @OperationServiceLog(description = "更新会员分组")
-    public MtUserGroup updateMemberGroup(MemberGroupDto memberGroupDto) throws BusinessCheckException {
+    public MtUserGroup updateMemberGroup(MemberGroupDto memberGroupDto, AccountInfo accountInfo) throws BusinessCheckException {
         MtUserGroup userGroup = queryMemberGroupById(memberGroupDto.getId());
         if (null == userGroup || StatusEnum.DISABLE.getKey().equalsIgnoreCase(userGroup.getStatus())) {
             logger.error("该分组不存在或已被删除");
             throw new BusinessCheckException("该分组不存在或已被删除");
+        }
+        if (accountInfo.getMerchantId() != null && !accountInfo.getMerchantId().equals(userGroup.getMerchantId())) {
+            throw new BusinessCheckException("不同商户，无操作权限");
         }
         if (memberGroupDto.getName() != null) {
             userGroup.setName(CommonUtil.replaceXSS(memberGroupDto.getName()));
@@ -234,8 +241,7 @@ public class MemberGroupServiceImpl extends ServiceImpl<MtUserGroupMapper, MtUse
      * */
     public Long getMemberNum(Integer groupId) {
         List<Integer> groupIds = getGroupIds(groupId);
-        Long totalMember = mtUserGroupMapper.getMemberNum(groupIds);
-        return totalMember;
+        return mtUserGroupMapper.getMemberNum(groupIds);
     }
 
     /**

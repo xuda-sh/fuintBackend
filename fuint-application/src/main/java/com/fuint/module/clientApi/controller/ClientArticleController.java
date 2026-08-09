@@ -1,13 +1,11 @@
 package com.fuint.module.clientApi.controller;
 
-import com.fuint.common.Constants;
-import com.fuint.common.dto.ArticleDto;
+import com.fuint.common.dto.content.ArticleDto;
 import com.fuint.common.enums.StatusEnum;
 import com.fuint.common.param.ArticleDetailParam;
-import com.fuint.common.param.ArticleListParam;
+import com.fuint.common.param.ArticlePage;
 import com.fuint.common.service.ArticleService;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.framework.web.BaseController;
 import com.fuint.framework.web.ResponseObject;
@@ -16,7 +14,6 @@ import com.fuint.utils.StringUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
-import java.lang.reflect.InvocationTargetException;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
@@ -48,21 +45,14 @@ public class ClientArticleController extends BaseController {
     @ApiOperation(value="获取文章列表", notes="获取文章列表")
     @RequestMapping(value = "/list", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject list(HttpServletRequest request,  @RequestBody ArticleListParam articleListParam) throws BusinessCheckException, InvocationTargetException, IllegalAccessException {
-        String title = articleListParam.getTitle();
-        Integer page = articleListParam.getPage() == null ? Constants.PAGE_NUMBER : articleListParam.getPage();
-        Integer pageSize = articleListParam.getPageSize() == null ? Constants.PAGE_SIZE : articleListParam.getPageSize();
+    public ResponseObject list(HttpServletRequest request, @RequestBody ArticlePage articlePage) throws BusinessCheckException {
         String merchantNo = request.getHeader("merchantNo") == null ? "" : request.getHeader("merchantNo");
 
-        Map<String, Object> params = new HashMap<>();
-        params.put("status", StatusEnum.ENABLED.getKey());
-        if (StringUtil.isNotEmpty(title)) {
-            params.put("title", title);
-        }
+        articlePage.setStatus(StatusEnum.ENABLED.getKey());
         if (StringUtil.isNotEmpty(merchantNo)) {
-            params.put("merchantNo", merchantNo);
+            articlePage.setMerchantNo(merchantNo);
         }
-        PaginationResponse<ArticleDto> paginationResponse = articleService.queryArticleListByPagination(new PaginationRequest(page, pageSize, params));
+        PaginationResponse<ArticleDto> paginationResponse = articleService.queryArticleListByPagination(articlePage);
 
         Map<String, Object> outParams = new HashMap();
         outParams.put("content", paginationResponse.getContent());
@@ -80,13 +70,8 @@ public class ClientArticleController extends BaseController {
     @ApiOperation(value="获取文章详情", notes="根据ID获取文章详情")
     @RequestMapping(value = "/detail", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject detail(@RequestBody ArticleDetailParam articleDetailParam) throws BusinessCheckException, InvocationTargetException, IllegalAccessException {
-        String articleIdStr = articleDetailParam.getArticleId() == null ? "" : articleDetailParam.getArticleId();
-        Integer articleId = 0;
-        if (StringUtil.isNotEmpty(articleIdStr)) {
-            articleId = Integer.parseInt(articleIdStr);
-        }
-
+    public ResponseObject detail(@RequestBody ArticleDetailParam articleDetailParam) throws BusinessCheckException {
+        Integer articleId = articleDetailParam.getArticleId() == null ? 0 : articleDetailParam.getArticleId();
         // 更新阅读点击数
         ArticleDto mtArticle = articleService.getArticleDetail(articleId);
         if (mtArticle != null && mtArticle.getId() != null) {

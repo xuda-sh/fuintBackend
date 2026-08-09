@@ -8,6 +8,7 @@ import com.fuint.utils.StringUtil;
 import lombok.AllArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import javax.servlet.http.HttpSession;
 import java.awt.image.BufferedImage;
@@ -19,7 +20,7 @@ import java.awt.image.BufferedImage;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class CaptchaServiceImpl implements CaptchaService {
 
     private static final Logger logger = LoggerFactory.getLogger(CaptchaServiceImpl.class);
@@ -75,7 +76,7 @@ public class CaptchaServiceImpl implements CaptchaService {
         // 生成验证码
         String codeText = captchaProducer.createText();
         BufferedImage codeImage = captchaProducer.createImage(codeText);
-        logger.info("生成验证码{}", codeText);
+        logger.info("生成验证码 = {}, uuid = {}", codeText, uuid);
 
         if (codeText != null) {
             RedisUtil.set(uuid, codeText, 1800);
@@ -92,6 +93,7 @@ public class CaptchaServiceImpl implements CaptchaService {
      */
     public Boolean checkCodeByUuid(String code, String uuid){
         String vCode = RedisUtil.get(uuid);
+        logger.info("checkCodeByUuid vCode = {}, code = {}， uuid = {}", vCode, code, uuid);
         if (StringUtil.isEmpty(code) || StringUtil.isEmpty(vCode)) {
             return false;
         } else {

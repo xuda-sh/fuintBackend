@@ -1,15 +1,13 @@
 package com.fuint.repository.model;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 
 /**
  * 商户表
@@ -17,8 +15,7 @@ import lombok.Setter;
  * Created by FSQ
  * CopyRight https://www.fuint.cn
  */
-@Getter
-@Setter
+@Data
 @TableName("mt_merchant")
 @ApiModel(value = "MtMerchant对象", description = "商户表")
 public class MtMerchant implements Serializable {
@@ -79,5 +76,15 @@ public class MtMerchant implements Serializable {
 
     @ApiModelProperty("最后操作人")
     private String operator;
+
+    @ApiModelProperty("有效期开始时间")
+    @TableField(updateStrategy = FieldStrategy.IGNORED)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    private Date startTime;
+
+    @ApiModelProperty("有效期结束时间")
+    @TableField(updateStrategy = FieldStrategy.IGNORED)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    private Date endTime;
 
 }

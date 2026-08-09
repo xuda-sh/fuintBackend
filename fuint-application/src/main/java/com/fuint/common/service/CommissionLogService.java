@@ -1,10 +1,11 @@
 package com.fuint.common.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.fuint.common.dto.CommissionLogDto;
-import com.fuint.framework.pagination.PaginationRequest;
-import com.fuint.framework.pagination.PaginationResponse;
+import com.fuint.common.dto.commission.CommissionLogDto;
+import com.fuint.common.dto.commission.CommissionOverviewDto;
+import com.fuint.common.param.CommissionLogPage;
 import com.fuint.framework.exception.BusinessCheckException;
+import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.module.backendApi.request.CommissionLogRequest;
 import com.fuint.repository.model.MtCommissionLog;
 
@@ -19,28 +20,34 @@ public interface CommissionLogService extends IService<MtCommissionLog> {
     /**
      * 分页查询列表
      *
-     * @param paginationRequest
+     * @param commissionLogPage
      * @return
      */
-    PaginationResponse<CommissionLogDto> queryCommissionLogByPagination(PaginationRequest paginationRequest) throws BusinessCheckException;
+    PaginationResponse<CommissionLogDto> queryCommissionLogByPagination(CommissionLogPage commissionLogPage);
+
+    /**
+     * 获取佣金概览数据
+     *
+     * @param userId 会员ID
+     * @return
+     */
+    CommissionOverviewDto getCommissionOverview(Integer userId);
 
     /**
      * 计算订单分销提成
      *
      * @param  orderId 订单ID
-     * @throws BusinessCheckException
      * @return
      */
-    void calculateCommission(Integer orderId) throws BusinessCheckException;
+    void calculateCommission(Integer orderId);
 
     /**
      * 根据ID获取记录信息
      *
      * @param  id 记录ID
-     * @throws BusinessCheckException
      * @return
      */
-    CommissionLogDto queryCommissionLogById(Integer id) throws BusinessCheckException;
+    CommissionLogDto queryCommissionLogById(Integer id);
 
     /**
      * 更新分销提成记录

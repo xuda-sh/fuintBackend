@@ -1,13 +1,15 @@
 package com.fuint.common.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.fuint.common.dto.MerchantDto;
-import com.fuint.common.dto.MerchantSettingDto;
+import com.fuint.common.dto.merchant.MerchantDto;
+import com.fuint.common.dto.merchant.MerchantSettingDto;
+import com.fuint.common.dto.system.AccountInfo;
+import com.fuint.common.param.MerchantPage;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.module.merchantApi.request.MerchantSettingParam;
 import com.fuint.repository.model.MtMerchant;
+
 import java.util.List;
 import java.util.Map;
 
@@ -22,37 +24,36 @@ public interface MerchantService extends IService<MtMerchant> {
     /**
      * 分页查询商户列表
      *
-     * @param paginationRequest
+     * @param merchantPage
      * @return
      */
-    PaginationResponse<MerchantDto> queryMerchantListByPagination(PaginationRequest paginationRequest) throws BusinessCheckException;
+    PaginationResponse<MerchantDto> queryMerchantListByPagination(MerchantPage merchantPage);
 
     /**
      * 保存商户信息
      *
      * @param  mtMerchant
+     * @param accountInfo
      * @throws BusinessCheckException
      * @return
      */
-    MtMerchant saveMerchant(MtMerchant mtMerchant) throws BusinessCheckException;
+    MtMerchant saveMerchant(MtMerchant mtMerchant, AccountInfo accountInfo) throws BusinessCheckException;
 
     /**
      * 根据ID获取商户信息
      *
      * @param  id 商户ID
-     * @throws BusinessCheckException
      * @return
      */
-    MtMerchant queryMerchantById(Integer id) throws BusinessCheckException;
+    MtMerchant queryMerchantById(Integer id);
 
     /**
      * 根据名称获取商户信息
      *
      * @param  name 商户名称
-     * @throws BusinessCheckException
      * @return
      */
-    MtMerchant queryMerchantByName(String name) throws BusinessCheckException;
+    MtMerchant queryMerchantByName(String name);
 
     /**
      * 根据商户号获取商户信息
@@ -74,12 +75,12 @@ public interface MerchantService extends IService<MtMerchant> {
      * 更新商户状态
      *
      * @param id       商户ID
-     * @param operator 操作人
+     * @param accountInfo 操作人
      * @param status   状态
      * @throws BusinessCheckException
      * @return
      */
-    void updateStatus(Integer id, String operator, String status) throws BusinessCheckException;
+    void updateStatus(Integer id, AccountInfo accountInfo, String status) throws BusinessCheckException;
 
     /**
      * 根据条件查询商户
@@ -87,7 +88,7 @@ public interface MerchantService extends IService<MtMerchant> {
      * @param params 查询参数
      * @return
      * */
-    List<MtMerchant> queryMerchantByParams(Map<String, Object> params) throws BusinessCheckException;
+    List<MtMerchant> queryMerchantByParams(Map<String, Object> params);
 
     /**
      * 查询我的商户列表
@@ -97,7 +98,7 @@ public interface MerchantService extends IService<MtMerchant> {
      * @param status 状态
      * @return
      * */
-    List<MtMerchant> getMyMerchantList(Integer merchantId, Integer storeId, String status) throws BusinessCheckException;
+    List<MtMerchant> getMyMerchantList(Integer merchantId, Integer storeId, String status);
 
     /**
      * 获取商户信息
@@ -106,14 +107,23 @@ public interface MerchantService extends IService<MtMerchant> {
      * @param storeId 店铺ID
      * @return
      * */
-    MerchantSettingDto getMerchantSettingInfo(Integer merchantId, Integer storeId) throws BusinessCheckException;
+    MerchantSettingDto getMerchantSettingInfo(Integer merchantId, Integer storeId);
 
     /**
      * 保存商户设置信息
      *
      * @param params 商户设置项
+     * @param accountInfo 登录账号信息
      * @return
      * */
-    MerchantSettingDto saveMerchantSetting(MerchantSettingParam params) throws BusinessCheckException;
+    MerchantSettingDto saveMerchantSetting(MerchantSettingParam params, AccountInfo accountInfo) throws BusinessCheckException;
+
+    /**
+     * 校验商户是否在有效期内
+     * 如果有效期未设置（开始/结束时间为空），视为永久有效
+     * @param merchantId 商户ID
+     * @throws BusinessCheckException 商户已过期时抛出
+     */
+    void checkMerchantValid(Integer merchantId) throws BusinessCheckException;
 
 }

@@ -3,17 +3,17 @@ package com.fuint.common.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fuint.common.dto.AccountInfo;
-import com.fuint.common.dto.BalanceDto;
-import com.fuint.common.dto.OrderDto;
+import com.fuint.common.dto.system.AccountInfo;
+import com.fuint.common.dto.member.BalanceDto;
+import com.fuint.common.dto.order.OrderDto;
 import com.fuint.common.enums.*;
+import com.fuint.common.param.BalancePage;
 import com.fuint.common.service.*;
 import com.fuint.common.util.CommonUtil;
 import com.fuint.common.util.DateUtil;
 import com.fuint.common.util.PhoneFormatCheckUtils;
 import com.fuint.framework.annoation.OperationServiceLog;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.mapper.MtBalanceMapper;
 import com.fuint.repository.mapper.MtUserMapper;
@@ -28,10 +28,12 @@ import lombok.AllArgsConstructor;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -42,7 +44,7 @@ import java.util.*;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class BalanceServiceImpl extends ServiceImpl<MtBalanceMapper, MtBalance> implements BalanceService {
 
     private static final Logger logger = LoggerFactory.getLogger(BalanceServiceImpl.class);
@@ -74,56 +76,56 @@ public class BalanceServiceImpl extends ServiceImpl<MtBalanceMapper, MtBalance> 
     /**
      * 分页查询余额列表
      *
-     * @param paginationRequest
+     * @param balancePage
      * @return
      */
     @Override
-    public PaginationResponse<BalanceDto> queryBalanceListByPagination(PaginationRequest paginationRequest) throws BusinessCheckException {
+    public PaginationResponse<BalanceDto> queryBalanceListByPagination(BalancePage balancePage) {
         LambdaQueryWrapper<MtBalance> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtBalance::getStatus, StatusEnum.DISABLE.getKey());
 
-        String description = paginationRequest.getSearchParams().get("description") == null ? "" : paginationRequest.getSearchParams().get("description").toString();
+        String description = balancePage.getDescription();
         if (StringUtils.isNotBlank(description)) {
             lambdaQueryWrapper.like(MtBalance::getDescription, description);
         }
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = balancePage.getStatus();
         if (StringUtils.isNotBlank(status)) {
             lambdaQueryWrapper.eq(MtBalance::getStatus, status);
         }
-        String userId = paginationRequest.getSearchParams().get("userId") == null ? "" : paginationRequest.getSearchParams().get("userId").toString();
-        if (StringUtils.isNotBlank(userId)) {
+        Integer userId = balancePage.getUserId();
+        if (userId != null) {
             lambdaQueryWrapper.eq(MtBalance::getUserId, userId);
         }
-        String orderSn = paginationRequest.getSearchParams().get("orderSn") == null ? "" : paginationRequest.getSearchParams().get("orderSn").toString();
+        String orderSn = balancePage.getOrderSn();
         if (StringUtils.isNotBlank(orderSn)) {
             lambdaQueryWrapper.eq(MtBalance::getOrderSn, orderSn);
         }
-        String mobile = paginationRequest.getSearchParams().get("mobile") == null ? "" : paginationRequest.getSearchParams().get("mobile").toString();
+        String mobile = balancePage.getMobile();
         if (StringUtils.isNotBlank(mobile)) {
             lambdaQueryWrapper.eq(MtBalance::getMobile, mobile);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = balancePage.getMerchantId();
+        if (merchantId != null) {
             lambdaQueryWrapper.eq(MtBalance::getMerchantId, merchantId);
         }
-        String userNo = paginationRequest.getSearchParams().get("userNo") == null ? "" : paginationRequest.getSearchParams().get("userNo").toString();
+        String userNo = balancePage.getUserNo();
         if (StringUtil.isNotEmpty(userNo)) {
-            if (StringUtil.isEmpty(merchantId)) {
-                merchantId = "0";
+            if (merchantId == null) {
+                merchantId = 0;
             }
-            MtUser userInfo = memberService.queryMemberByUserNo(Integer.parseInt(merchantId), userNo);
+            MtUser userInfo = memberService.queryMemberByUserNo(merchantId, userNo);
             if (userInfo != null) {
                 lambdaQueryWrapper.eq(MtBalance::getUserId, userInfo.getId());
             } else {
                 lambdaQueryWrapper.eq(MtBalance::getUserId, -1);
             }
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotBlank(storeId)) {
+        Integer storeId = balancePage.getStoreId();
+        if (storeId != null) {
             lambdaQueryWrapper.eq(MtBalance::getStoreId, storeId);
         }
         lambdaQueryWrapper.orderByDesc(MtBalance::getId);
-        Page<MtBanner> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        Page<MtBanner> pageHelper = PageHelper.startPage(balancePage.getPage(), balancePage.getPageSize());
         List<MtBalance> balanceList = mtBalanceMapper.selectList(lambdaQueryWrapper);
 
         List<BalanceDto> dataList = new ArrayList<>();
@@ -146,7 +148,7 @@ public class BalanceServiceImpl extends ServiceImpl<MtBalanceMapper, MtBalance> 
             dataList.add(item);
         }
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(balancePage.getPage(), balancePage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<BalanceDto> paginationResponse = new PaginationResponse(pageImpl, BalanceDto.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -162,6 +164,7 @@ public class BalanceServiceImpl extends ServiceImpl<MtBalanceMapper, MtBalance> 
      * @param  mtBalance
      * @param  updateBalance
      * @throws BusinessCheckException
+     * @return
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -186,6 +189,7 @@ public class BalanceServiceImpl extends ServiceImpl<MtBalanceMapper, MtBalance> 
         mtBalance.setMerchantId(mtUser.getMerchantId());
         if (updateBalance) {
             mtUserMapper.updateUserBalance(mtUser.getMerchantId(), Arrays.asList(mtUser.getId()), mtBalance.getAmount());
+            logger.info("会员余额变动：" + mtUser.getMobile() + "，会员ID：" + mtUser.getId() + "，会员余额：" + newAmount);
         }
 
         if (PhoneFormatCheckUtils.isChinaPhoneLegal(mtUser.getMobile())) {
@@ -232,13 +236,12 @@ public class BalanceServiceImpl extends ServiceImpl<MtBalanceMapper, MtBalance> 
 
         // 发送小程序订阅消息
         Date nowTime = new Date();
-        Date sendTime = new Date(nowTime.getTime() + 60000);
         Map<String, Object> params = new HashMap<>();
         String dateTime = DateUtil.formatDate(Calendar.getInstance().getTime(), "yyyy-MM-dd HH:mm");
         params.put("amount", mtBalance.getAmount());
         params.put("time", dateTime);
         params.put("tips", "您的余额发生了变动，请留意~");
-        weixinService.sendSubscribeMessage(mtBalance.getMerchantId(), mtBalance.getUserId(), mtUser.getOpenId(), WxMessageEnum.BALANCE_CHANGE.getKey(), "pages/user/index", params, sendTime);
+        weixinService.sendSubscribeMessage(mtBalance.getMerchantId(), mtBalance.getUserId(), mtUser.getOpenId(), WxMessageEnum.BALANCE_CHANGE.getKey(), "pages/user/index", params, nowTime);
 
         return true;
     }
@@ -251,6 +254,7 @@ public class BalanceServiceImpl extends ServiceImpl<MtBalanceMapper, MtBalance> 
      * @param userIds 会员ID
      * @param amount 发放金额
      * @param remark 备注
+     * @throws BusinessCheckException
      * @return
      */
     @Override
@@ -276,6 +280,13 @@ public class BalanceServiceImpl extends ServiceImpl<MtBalanceMapper, MtBalance> 
         if (userIdList != null && userIdList.size() > 0) {
             for (String userId : userIdList) {
                 if (StringUtil.isNotEmpty(userId) && !userIdArr.contains(Integer.parseInt(userId))) {
+                    MtUser mtUser = mtUserMapper.selectById(Integer.parseInt(userId));
+                    if (mtUser == null) {
+                        throw new BusinessCheckException("会员不存在");
+                    }
+                    if (!mtUser.getMerchantId().equals(accountInfo.getMerchantId())) {
+                        throw new BusinessCheckException("不同商户，无操作权限");
+                    }
                     userIdArr.add(Integer.parseInt(userId));
                 }
             }

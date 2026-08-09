@@ -15,9 +15,13 @@ import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
 import org.springframework.core.env.Environment;
 import org.springframework.web.bind.annotation.*;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 手机短信controller
@@ -105,7 +109,6 @@ public class ClientSmsController extends BaseController {
         }
 
         // 发送短信
-        Map<Boolean,List<String>> result;
         List<String> mobileList = new ArrayList<>();
         mobileList.add(mobile);
 
@@ -115,7 +118,7 @@ public class ClientSmsController extends BaseController {
         // 短信模板
         Map<String, String> params = new HashMap<>();
         params.put("code", verifyCode);
-        result = sendSmsService.sendSms(merchantId,"login-code", mobileList, params);
+        Map<Boolean,List<String>> result = sendSmsService.sendSms(merchantId,"login-code", mobileList, params);
         return getSuccessResult(result);
     }
 }

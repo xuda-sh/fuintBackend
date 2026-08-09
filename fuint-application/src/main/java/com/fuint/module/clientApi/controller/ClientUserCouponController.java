@@ -1,17 +1,13 @@
 package com.fuint.module.clientApi.controller;
 
 import com.fuint.common.config.Message;
-import com.fuint.common.dto.UserCouponDto;
-import com.fuint.common.dto.UserInfo;
+import com.fuint.common.dto.coupon.UserCouponDto;
+import com.fuint.common.dto.member.UserInfo;
 import com.fuint.common.enums.CouponExpireTypeEnum;
 import com.fuint.common.enums.CouponTypeEnum;
 import com.fuint.common.enums.UserCouponStatusEnum;
 import com.fuint.common.service.*;
-import com.fuint.common.util.DateUtil;
-import com.fuint.common.util.QRCodeUtil;
-import com.fuint.common.util.SeqUtil;
-import com.fuint.common.util.TokenUtil;
-import com.fuint.common.util.Base64Util;
+import com.fuint.common.util.*;
 import com.fuint.framework.exception.BusinessCheckException;
 import com.fuint.framework.web.BaseController;
 import com.fuint.framework.web.ResponseObject;
@@ -24,10 +20,9 @@ import lombok.AllArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
-import javax.servlet.http.HttpServletRequest;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -85,7 +80,7 @@ public class ClientUserCouponController extends BaseController {
     @ApiOperation(value = "查询会员卡券详情")
     @RequestMapping(value = "/detail", method = RequestMethod.GET)
     @CrossOrigin
-    public ResponseObject detail(HttpServletRequest request, @RequestParam Map<String, Object> param) throws BusinessCheckException, InvocationTargetException, IllegalAccessException {
+    public ResponseObject detail(@RequestParam Map<String, Object> param) throws BusinessCheckException {
         Integer userCouponId = param.get("userCouponId") == null ? 0 : Integer.parseInt(param.get("userCouponId").toString());
         String userCouponCode = param.get("userCouponCode") == null ? "" : param.get("userCouponCode").toString();
 
@@ -97,7 +92,7 @@ public class ClientUserCouponController extends BaseController {
             return getFailureResult(1004);
         }
 
-        UserInfo mtUser = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo mtUser = TokenUtil.getUserInfo();
         if (null == mtUser) {
             return getFailureResult(1001);
         }

@@ -1,15 +1,15 @@
 package com.fuint.module.clientApi.controller;
 
 import com.fuint.common.Constants;
-import com.fuint.common.dto.GiveDto;
-import com.fuint.common.dto.UserInfo;
+import com.fuint.common.dto.coupon.GiveDto;
+import com.fuint.common.dto.member.UserInfo;
 import com.fuint.common.param.GiveListParam;
+import com.fuint.common.param.GivePage;
 import com.fuint.common.param.GiveParam;
 import com.fuint.common.service.GiveService;
 import com.fuint.common.service.MemberService;
 import com.fuint.common.util.TokenUtil;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.framework.web.BaseController;
 import com.fuint.framework.web.ResponseObject;
@@ -19,7 +19,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-import javax.servlet.http.HttpServletRequest;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -51,8 +51,8 @@ public class ClientGiveController extends BaseController {
     @ApiOperation(value = "转赠卡券")
     @RequestMapping(value = "/doGive", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject doGive(HttpServletRequest request, @RequestBody GiveParam giveParam) throws BusinessCheckException {
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+    public ResponseObject doGive(@RequestBody GiveParam giveParam) throws BusinessCheckException {
+        UserInfo userInfo = TokenUtil.getUserInfo();
         MtUser mtUser = memberService.queryMemberById(userInfo.getId());
         giveParam.setUserId(mtUser.getId());
         giveParam.setStoreId(mtUser.getStoreId());
@@ -67,26 +67,28 @@ public class ClientGiveController extends BaseController {
     @ApiOperation(value = "查询转赠记录")
     @RequestMapping(value = "/giveLog", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject giveLog(HttpServletRequest request, @RequestBody GiveListParam giveListParam) throws BusinessCheckException {
-        UserInfo mtUser = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+    public ResponseObject giveLog(@RequestBody GiveListParam giveListParam) {
+        UserInfo mtUser = TokenUtil.getUserInfo();
         String mobile = giveListParam.getMobile() == null ? "" : giveListParam.getMobile();
         String type = giveListParam.getType() == null ? "give" : giveListParam.getType();
         Integer page = giveListParam.getPage() == null ? Constants.PAGE_NUMBER : giveListParam.getPage();
         Integer pageSize = giveListParam.getPageSize() == null ? Constants.PAGE_SIZE : giveListParam.getPageSize();
 
-        Map<String, Object> searchParams = new HashMap<>();
+        GivePage givePage = new GivePage();
+        givePage.setPage(page);
+        givePage.setPageSize(pageSize);
         if (type.equals("gived")) {
-            searchParams.put("userId", mtUser.getId());
+            givePage.setUserId(mtUser.getId());
         } else {
-            searchParams.put("giveUserId", mtUser.getId());
+            givePage.setGiveUserId(mtUser.getId());
         }
 
         if (StringUtil.isNotEmpty(mobile) && type.equals("give")) {
-            searchParams.put("mobile", mobile);
+            givePage.setMobile(mobile);
         } else if(StringUtil.isNotEmpty(mobile) && type.equals("gived")) {
-            searchParams.put("userMobile", mobile);
+            givePage.setUserMobile(mobile);
         }
-        PaginationResponse<GiveDto> paginationResponse = giveService.queryGiveListByPagination(new PaginationRequest(page, pageSize, searchParams));
+        PaginationResponse<GiveDto> paginationResponse = giveService.queryGiveListByPagination(givePage);
 
         Map<String, Object> outParams = new HashMap();
         outParams.put("content", paginationResponse.getContent());

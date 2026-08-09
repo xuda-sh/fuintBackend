@@ -4,8 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fuint.common.enums.StatusEnum;
+import com.fuint.common.param.UserActionPage;
 import com.fuint.common.service.UserActionService;
-import com.fuint.framework.pagination.PaginationRequest;
+import com.fuint.framework.exception.BusinessCheckException;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.mapper.MtUserActionMapper;
 import com.fuint.repository.model.MtUserAction;
@@ -13,6 +14,7 @@ import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import lombok.AllArgsConstructor;
 import org.apache.commons.lang.StringUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -28,7 +30,7 @@ import java.util.Map;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class UserActionServiceImpl extends ServiceImpl<MtUserActionMapper, MtUserAction> implements UserActionService {
 
     private MtUserActionMapper mtUserActionMapper;
@@ -36,28 +38,28 @@ public class UserActionServiceImpl extends ServiceImpl<MtUserActionMapper, MtUse
     /**
      * 分页查询会员行为记录列表
      *
-     * @param paginationRequest
+     * @param userActionPage
      * @return
      */
     @Override
-    public PaginationResponse<MtUserAction> queryUserActionListByPagination(PaginationRequest paginationRequest) {
-        Page<MtUserAction> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<MtUserAction> queryUserActionListByPagination(UserActionPage userActionPage) {
+        Page<MtUserAction> pageHelper = PageHelper.startPage(userActionPage.getPage(), userActionPage.getPageSize());
         LambdaQueryWrapper<MtUserAction> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtUserAction::getStatus, StatusEnum.DISABLE.getKey());
 
-        String description = paginationRequest.getSearchParams().get("description") == null ? "" : paginationRequest.getSearchParams().get("description").toString();
+        String description = userActionPage.getDescription();
         if (StringUtils.isNotBlank(description)) {
             lambdaQueryWrapper.like(MtUserAction::getDescription, description);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = userActionPage.getMerchantId();
+        if (merchantId != null) {
             lambdaQueryWrapper.eq(MtUserAction::getMerchantId, merchantId);
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotBlank(storeId)) {
+        Integer storeId = userActionPage.getStoreId();
+        if (storeId != null) {
             lambdaQueryWrapper.eq(MtUserAction::getStoreId, storeId);
         }
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = userActionPage.getStatus();
         if (StringUtils.isNotBlank(status)) {
             lambdaQueryWrapper.eq(MtUserAction::getStatus, status);
         }
@@ -65,7 +67,7 @@ public class UserActionServiceImpl extends ServiceImpl<MtUserActionMapper, MtUse
         lambdaQueryWrapper.orderByDesc(MtUserAction::getId);
         List<MtUserAction> dataList = mtUserActionMapper.selectList(lambdaQueryWrapper);
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(userActionPage.getPage(), userActionPage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<MtUserAction> paginationResponse = new PaginationResponse(pageImpl, MtUserAction.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -82,9 +84,9 @@ public class UserActionServiceImpl extends ServiceImpl<MtUserActionMapper, MtUse
      * @return
      */
     @Override
-    public boolean addUserAction(MtUserAction reqUserAction) {
+    public boolean addUserAction(MtUserAction reqUserAction) throws BusinessCheckException {
         if (reqUserAction.getAction() == null || reqUserAction.getUserId() == null) {
-            return false;
+            throw new BusinessCheckException("会员行为信息不完整");
         }
 
         Map<String, Object> params = new HashMap<>();

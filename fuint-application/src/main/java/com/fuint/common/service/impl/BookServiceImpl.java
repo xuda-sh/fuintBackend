@@ -3,32 +3,35 @@ package com.fuint.common.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fuint.common.dto.BookDto;
-import com.fuint.common.dto.DayDto;
-import com.fuint.common.dto.TimeDto;
+import com.fuint.common.dto.book.BookDto;
+import com.fuint.common.dto.common.DayDto;
+import com.fuint.common.dto.common.TimeDto;
+import com.fuint.common.dto.system.AccountInfo;
+import com.fuint.common.enums.StatusEnum;
+import com.fuint.common.param.BookPage;
 import com.fuint.common.param.BookableParam;
 import com.fuint.common.service.BookService;
+import com.fuint.common.service.SettingService;
 import com.fuint.common.service.StoreService;
 import com.fuint.common.util.DateUtil;
 import com.fuint.framework.annoation.OperationServiceLog;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.mapper.MtBookItemMapper;
 import com.fuint.repository.mapper.MtBookMapper;
 import com.fuint.repository.model.MtBanner;
-import com.fuint.common.service.SettingService;
-import com.fuint.common.enums.StatusEnum;
 import com.fuint.repository.model.MtBook;
+import com.fuint.repository.model.MtBookItem;
 import com.fuint.repository.model.MtStore;
 import com.fuint.utils.StringUtil;
+import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import lombok.AllArgsConstructor;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.github.pagehelper.Page;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -37,7 +40,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -48,7 +50,7 @@ import java.util.*;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class BookServiceImpl extends ServiceImpl<MtBookMapper, MtBook> implements BookService {
 
     private static final Logger logger = LoggerFactory.getLogger(BookServiceImpl.class);
@@ -70,37 +72,35 @@ public class BookServiceImpl extends ServiceImpl<MtBookMapper, MtBook> implement
     /**
      * 分页查询预约列表
      *
-     * @param paginationRequest
+     * @param bookPage
      * @return
      */
     @Override
-    public PaginationResponse<BookDto> queryBookListByPagination(PaginationRequest paginationRequest) {
-        Page<MtBanner> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<BookDto> queryBookListByPagination(BookPage bookPage) {
+        Page<MtBanner> pageHelper = PageHelper.startPage(bookPage.getPage(), bookPage.getPageSize());
         LambdaQueryWrapper<MtBook> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtBook::getStatus, StatusEnum.DISABLE.getKey());
 
-        String name = paginationRequest.getSearchParams().get("name") == null ? "" : paginationRequest.getSearchParams().get("name").toString();
+        String name = bookPage.getName();
         if (StringUtils.isNotBlank(name)) {
             lambdaQueryWrapper.like(MtBook::getName, name);
         }
-        String cateId = paginationRequest.getSearchParams().get("cateId") == null ? "" : paginationRequest.getSearchParams().get("cateId").toString();
-        if (StringUtils.isNotBlank(cateId)) {
+        Integer cateId = bookPage.getCateId();
+        if (cateId != null && cateId > 0) {
             lambdaQueryWrapper.like(MtBook::getCateId, cateId);
         }
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
-        if (StringUtils.isNotBlank(status)) {
-            lambdaQueryWrapper.eq(MtBook::getStatus, status);
+        if (StringUtils.isNotBlank(bookPage.getStatus())) {
+            lambdaQueryWrapper.eq(MtBook::getStatus, bookPage.getStatus());
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = bookPage.getMerchantId();
+        if (merchantId != null && merchantId > 0) {
             lambdaQueryWrapper.eq(MtBook::getMerchantId, merchantId);
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotBlank(storeId)) {
+        if (bookPage.getStoreId() != null) {
             lambdaQueryWrapper.and(wq -> wq
                     .eq(MtBook::getStoreId, 0)
                     .or()
-                    .eq(MtBook::getStoreId, storeId));
+                    .eq(MtBook::getStoreId, bookPage.getStoreId()));
         }
 
         lambdaQueryWrapper.orderByAsc(MtBook::getSort);
@@ -116,7 +116,7 @@ public class BookServiceImpl extends ServiceImpl<MtBookMapper, MtBook> implement
             }
         }
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(bookPage.getPage(), bookPage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<BookDto> paginationResponse = new PaginationResponse(pageImpl, BookDto.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -129,12 +129,15 @@ public class BookServiceImpl extends ServiceImpl<MtBookMapper, MtBook> implement
     /**
      * 添加预约项目
      *
-     * @param mtBook 预约信息
+     * @param  bookDto 预约信息
+     * @throws BusinessCheckException
      * @return
      */
     @Override
     @OperationServiceLog(description = "添加预约项目")
-    public MtBook addBook(MtBook mtBook) throws BusinessCheckException {
+    public MtBook addBook(BookDto bookDto) throws BusinessCheckException {
+        MtBook mtBook = new MtBook();
+        BeanUtils.copyProperties(bookDto, mtBook);
         Integer storeId = mtBook.getStoreId() == null ? 0 : mtBook.getStoreId();
         if (mtBook.getMerchantId() == null || mtBook.getMerchantId() <= 0) {
             MtStore mtStore = storeService.queryStoreById(storeId);
@@ -249,57 +252,61 @@ public class BookServiceImpl extends ServiceImpl<MtBookMapper, MtBook> implement
     /**
      * 修改预约项目
      *
-     * @param  mtBook
+     * @param  bookDto
+     * @param  accountInfo
      * @throws BusinessCheckException
      * @return
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @OperationServiceLog(description = "修改预约项目")
-    public MtBook updateBook(MtBook mtBook) throws BusinessCheckException {
-        MtBook book = mtBookMapper.selectById(mtBook.getId());
-        if (book == null) {
+    public MtBook updateBook(BookDto bookDto, AccountInfo accountInfo) throws BusinessCheckException {
+        MtBook mtBook = mtBookMapper.selectById(bookDto.getId());
+        if (mtBook == null) {
             throw new BusinessCheckException("该预约项目状态异常");
         }
-        if (mtBook.getLogo() != null) {
-            book.setLogo(mtBook.getLogo());
+        if (!mtBook.getMerchantId().equals(accountInfo.getMerchantId())) {
+            throw new BusinessCheckException("不同商户，无操作权限");
         }
-        if (mtBook.getCateId() != null) {
-            book.setCateId(mtBook.getCateId());
+        if (bookDto.getLogo() != null) {
+            mtBook.setLogo(bookDto.getLogo());
         }
-        if (book.getName() != null) {
-            book.setName(mtBook.getName());
+        if (bookDto.getCateId() != null) {
+            mtBook.setCateId(bookDto.getCateId());
         }
-        if (mtBook.getStoreId() != null) {
-            book.setStoreId(mtBook.getStoreId());
+        if (bookDto.getName() != null) {
+            mtBook.setName(bookDto.getName());
         }
-        if (mtBook.getDescription() != null) {
-            book.setDescription(mtBook.getDescription());
+        if (bookDto.getStoreId() != null) {
+            mtBook.setStoreId(bookDto.getStoreId());
         }
-        if (mtBook.getOperator() != null) {
-            book.setOperator(mtBook.getOperator());
+        if (bookDto.getDescription() != null) {
+            mtBook.setDescription(bookDto.getDescription());
         }
-        if (mtBook.getStatus() != null) {
-            book.setStatus(mtBook.getStatus());
+        if (bookDto.getOperator() != null) {
+            mtBook.setOperator(bookDto.getOperator());
         }
-        if (mtBook.getGoodsId() != null) {
-            book.setGoodsId(mtBook.getGoodsId());
+        if (bookDto.getStatus() != null) {
+            mtBook.setStatus(bookDto.getStatus());
         }
-        if (mtBook.getSort() != null) {
-            book.setSort(mtBook.getSort());
+        if (bookDto.getGoodsId() != null) {
+            mtBook.setGoodsId(bookDto.getGoodsId());
         }
-        if (mtBook.getServiceDates() != null) {
-            book.setServiceDates(mtBook.getServiceDates());
+        if (bookDto.getSort() != null) {
+            mtBook.setSort(bookDto.getSort());
         }
-        if (mtBook.getServiceTimes() != null) {
-            book.setServiceTimes(mtBook.getServiceTimes());
+        if (bookDto.getServiceDates() != null) {
+            mtBook.setServiceDates(bookDto.getServiceDates());
         }
-        if (mtBook.getServiceStaffIds() != null) {
-            book.setServiceStaffIds(mtBook.getServiceStaffIds());
+        if (bookDto.getServiceTimes() != null) {
+            mtBook.setServiceTimes(bookDto.getServiceTimes());
         }
-        book.setUpdateTime(new Date());
-        mtBookMapper.updateById(book);
-        return book;
+        if (bookDto.getServiceStaffIds() != null) {
+            mtBook.setServiceStaffIds(bookDto.getServiceStaffIds());
+        }
+        mtBook.setUpdateTime(new Date());
+        mtBookMapper.updateById(mtBook);
+        return mtBook;
     }
 
     /**
@@ -310,7 +317,7 @@ public class BookServiceImpl extends ServiceImpl<MtBookMapper, MtBook> implement
      * @return
      * */
     @Override
-    public List<String> isBookable(BookableParam param) throws BusinessCheckException,ParseException {
+    public List<String> isBookable(BookableParam param) throws BusinessCheckException, ParseException {
        MtBook mtBook = mtBookMapper.selectById(param.getBookId());
        List<String> result = new ArrayList<>();
        if (mtBook == null) {
@@ -321,52 +328,48 @@ public class BookServiceImpl extends ServiceImpl<MtBookMapper, MtBook> implement
        if (StringUtil.isNotEmpty(param.getDate())) {
            bookList = mtBookItemMapper.getBookList(param.getBookId(), param.getDate(), param.getTime());
        }
-       Integer bookNum = bookList.size();
 
-       Integer limit = 0;
-       String serviceTime = mtBook.getServiceTimes();
-
-       // 未填写时段，则未来
-       if (StringUtil.isEmpty(serviceTime)) {
-           serviceTime = "08:30-12:00-1,14:00-18:00-1";
+       // 未填写时段，则默认上午一约、下午一约
+       if (StringUtil.isEmpty(mtBook.getServiceTimes())) {
+           mtBook.setServiceTimes("08:30-12:00-1,14:00-18:00-1");
        }
 
-       if (StringUtil.isNotEmpty(serviceTime)) {
-           String[] times = serviceTime.split(",");
-           if (times.length > 0) {
-               for (String str : times) {
-                    if (str.indexOf(param.getTime()) >= 0) {
-                        String[] timeArr = str.split("-");
-                        if (timeArr.length > 2) {
-                            limit = Integer.parseInt(timeArr[2]);
-                        }
-                    }
+       Integer bookNum = bookList.size();
+       Date now = new Date();
+       if (StringUtil.isNotEmpty(param.getTime())) {
+           String[] arr = param.getTime().split("-");
+           String dateTime = param.getDate() + " " + arr[1]+":00";
+           Date currentDate = DateUtil.parseDate(dateTime);
+           Boolean hasBook = false;
+           if (param.getUserId() != null && param.getUserId() > 0 && StringUtil.isNotEmpty(param.getDate())) {
+               MtBookItem mtBookItem = mtBookItemMapper.getBookItemByUserId(param.getUserId(), param.getBookId(), param.getDate(), param.getTime());
+               if (mtBookItem != null) {
+                   hasBook = true;
                }
            }
-       }
-       Date now = new Date();
-       if (bookNum < limit) {
-           if (StringUtil.isNotEmpty(param.getTime())) {
-               String[] arr = param.getTime().split("-");
-               String dateTime = param.getDate() + " " + arr[1]+":00";
-               Date currentDate = DateUtil.parseDate(dateTime);
-               if (now.compareTo(currentDate) < 0) {
-                   result.add(param.getTime());
-               }
-           } else {
-               String[] times = mtBook.getServiceTimes().split(",");
-               if (times.length > 0) {
-                   for (String str : times) {
-                        String[] arr = str.split("-");
-                        if (arr.length > 2) {
-                            String item = arr[0] + "-" + arr[1];
-                            String dateTime = param.getDate() + " " + arr[1]+":00";
-                            Date currentDate = DateUtil.parseDate(dateTime);
-                            if (!bookList.contains(item) && now.compareTo(currentDate) < 0) {
-                                result.add(item);
+           if (!hasBook && now.compareTo(currentDate) < 0) {
+               result.add(param.getTime());
+           }
+       } else {
+           String[] times = mtBook.getServiceTimes().split(",");
+           if (times.length > 0) {
+               for (String str : times) {
+                    String[] arr = str.split("-");
+                    if (arr.length > 2) {
+                        String item = arr[0] + "-" + arr[1];
+                        String dateTime = param.getDate() + " " + arr[1]+":00";
+                        Date currentDate = DateUtil.parseDate(dateTime);
+                        Boolean hasBook = false;
+                        if (param.getUserId() != null && param.getUserId() > 0 && StringUtil.isNotEmpty(param.getDate())) {
+                            MtBookItem mtBookItem = mtBookItemMapper.getBookItemByUserId(param.getUserId(), param.getBookId(), param.getDate(), item);
+                            if (mtBookItem != null) {
+                                hasBook = true;
                             }
                         }
-                   }
+                        if ((!bookList.contains(item) || bookNum < Integer.parseInt(arr[2])) && !hasBook && now.compareTo(currentDate) < 0) {
+                            result.add(item);
+                        }
+                    }
                }
            }
        }
@@ -374,31 +377,19 @@ public class BookServiceImpl extends ServiceImpl<MtBookMapper, MtBook> implement
     }
 
     /**
-     * 根据条件搜索预约项目
+     * 获取预约项目列表
      *
-     * @param  params 查询参数
-     * @throws BusinessCheckException
+     * @param  merchantId 商户ID
+     * @param  storeId 店铺ID
      * @return
      * */
-    @Override
-    public List<MtBook> queryBookListByParams(Map<String, Object> params) {
-        String status =  params.get("status") == null ? StatusEnum.ENABLED.getKey(): params.get("status").toString();
-        String storeId =  params.get("storeId") == null ? "" : params.get("storeId").toString();
-        String merchantId =  params.get("merchantId") == null ? "" : params.get("merchantId").toString();
-        String name = params.get("name") == null ? "" : params.get("name").toString();
-
+    public List<MtBook> getBookList(Integer merchantId, Integer storeId) {
         LambdaQueryWrapper<MtBook> lambdaQueryWrapper = Wrappers.lambdaQuery();
-        lambdaQueryWrapper.ne(MtBook::getStatus, StatusEnum.DISABLE.getKey());
-        if (StringUtils.isNotBlank(name)) {
-            lambdaQueryWrapper.like(MtBook::getName, name);
-        }
-        if (StringUtils.isNotBlank(status)) {
-            lambdaQueryWrapper.eq(MtBook::getStatus, status);
-        }
-        if (StringUtils.isNotBlank(merchantId)) {
+        lambdaQueryWrapper.eq(MtBook::getStatus, StatusEnum.ENABLED.getKey());
+        if (merchantId != null && merchantId > 0) {
             lambdaQueryWrapper.eq(MtBook::getMerchantId, merchantId);
         }
-        if (StringUtils.isNotBlank(storeId)) {
+        if (storeId != null && storeId > 0) {
             lambdaQueryWrapper.eq(MtBook::getStoreId, storeId);
         }
 

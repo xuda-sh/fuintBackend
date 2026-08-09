@@ -1,10 +1,10 @@
 package com.fuint.common.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.fuint.common.dto.GiveDto;
+import com.fuint.common.dto.coupon.GiveDto;
+import com.fuint.common.param.GivePage;
 import com.fuint.common.param.GiveParam;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.framework.web.ResponseObject;
 import com.fuint.repository.model.MtGive;
@@ -24,10 +24,10 @@ public interface GiveService extends IService<MtGive> {
     /**
      * 分页查询列表
      *
-     * @param paginationRequest
+     * @param givePage
      * @return
      */
-    PaginationResponse<GiveDto> queryGiveListByPagination(PaginationRequest paginationRequest) throws BusinessCheckException;
+    PaginationResponse<GiveDto> queryGiveListByPagination(GivePage givePage);
 
     /**
      * 转赠卡券
@@ -39,19 +39,17 @@ public interface GiveService extends IService<MtGive> {
     ResponseObject addGive(GiveParam giveParam) throws BusinessCheckException;
 
     /**
-     * 根据组ID获取信息
+     * 根据ID获取信息
      *
      * @param id ID
-     * @throws BusinessCheckException
      * @return
      */
-    MtGive queryGiveById(Long id) throws BusinessCheckException;
+    MtGive queryGiveById(Long id);
 
     /**
      * 根据条件搜索转赠详情
      *
      * @param params
-     * @throws BusinessCheckException
      * @return
      * */
     List<MtGiveItem> queryItemByParams(Map<String, Object> params);

@@ -4,14 +4,13 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fuint.common.dto.NavigationDto;
-import com.fuint.common.dto.ParamDto;
+import com.fuint.common.dto.common.ParamDto;
+import com.fuint.common.dto.content.NavigationDto;
 import com.fuint.common.enums.*;
 import com.fuint.framework.annoation.OperationServiceLog;
 import com.fuint.repository.mapper.MtSettingMapper;
 import com.fuint.repository.model.MtSetting;
 import com.fuint.common.service.SettingService;
-import com.fuint.framework.exception.BusinessCheckException;
 import com.fuint.utils.StringUtil;
 import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Lazy;
@@ -52,7 +51,6 @@ public class SettingServiceImpl extends ServiceImpl<MtSettingMapper, MtSetting> 
      * @param  merchantId 商户ID
      * @param  type 类型
      * @param  name 配置名称
-     * @throws BusinessCheckException
      * @return
      */
     @Override
@@ -68,7 +66,6 @@ public class SettingServiceImpl extends ServiceImpl<MtSettingMapper, MtSetting> 
      * 保存配置
      *
      * @param  mtSetting 配置参数
-     * @throws BusinessCheckException
      * @return
      */
     @Override
@@ -113,7 +110,6 @@ public class SettingServiceImpl extends ServiceImpl<MtSettingMapper, MtSetting> 
      *
      * @param  merchantId 商户ID
      * @param  type 配置类型
-     * @throws BusinessCheckException
      * @return
      */
     @Override
@@ -127,7 +123,6 @@ public class SettingServiceImpl extends ServiceImpl<MtSettingMapper, MtSetting> 
      * @param  merchantId 商户ID
      * @param  type 类型
      * @param  name 配置名称
-     * @throws BusinessCheckException
      * @return
      */
     @Override
@@ -142,7 +137,6 @@ public class SettingServiceImpl extends ServiceImpl<MtSettingMapper, MtSetting> 
      * @param  storeId 店铺ID
      * @param  type 类型
      * @param  name 配置名称
-     * @throws BusinessCheckException
      * @return
      */
     @Override
@@ -171,6 +165,14 @@ public class SettingServiceImpl extends ServiceImpl<MtSettingMapper, MtSetting> 
             }
         }
 
+        // 确保返回的路径不为 null，并去掉末尾的斜杠
+        if (StringUtil.isEmpty(basePath)) {
+            basePath = "";
+        }
+        if (basePath.endsWith("/")) {
+            basePath = basePath.substring(0, basePath.length() - 1);
+        }
+
         return basePath;
     }
 
@@ -183,7 +185,7 @@ public class SettingServiceImpl extends ServiceImpl<MtSettingMapper, MtSetting> 
      * @return
      * */
     @Override
-    public List<ParamDto> getPayTypeList(Integer merchantId, Integer storeId, String platform) throws BusinessCheckException {
+    public List<ParamDto> getPayTypeList(Integer merchantId, Integer storeId, String platform) {
         List<ParamDto> payTypeList = new ArrayList<>();
 
         // 微信jsapi

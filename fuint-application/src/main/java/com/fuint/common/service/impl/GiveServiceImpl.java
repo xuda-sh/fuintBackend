@@ -3,14 +3,14 @@ package com.fuint.common.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fuint.common.dto.GiveDto;
+import com.fuint.common.dto.coupon.GiveDto;
 import com.fuint.common.enums.StatusEnum;
+import com.fuint.common.param.GivePage;
 import com.fuint.common.param.GiveParam;
 import com.fuint.common.service.*;
 import com.fuint.common.util.CommonUtil;
 import com.fuint.common.util.DateUtil;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.framework.web.ResponseObject;
 import com.fuint.repository.mapper.MtGiveItemMapper;
@@ -25,10 +25,12 @@ import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -39,7 +41,7 @@ import java.util.*;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class GiveServiceImpl extends ServiceImpl<MtGiveMapper, MtGive> implements GiveService {
 
     private static final Logger logger = LoggerFactory.getLogger(GiveServiceImpl.class);
@@ -78,45 +80,45 @@ public class GiveServiceImpl extends ServiceImpl<MtGiveMapper, MtGive> implement
     /**
      * 分页查询转赠列表
      *
-     * @param paginationRequest
+     * @param givePage
      * @return
      */
     @Override
-    public PaginationResponse<GiveDto> queryGiveListByPagination(PaginationRequest paginationRequest) {
-        Page<MtGive> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<GiveDto> queryGiveListByPagination(GivePage givePage) {
+        Page<MtGive> pageHelper = PageHelper.startPage(givePage.getPage(), givePage.getPageSize());
         LambdaQueryWrapper<MtGive> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtGive::getStatus, StatusEnum.DISABLE.getKey());
 
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = givePage.getStatus();
         if (StringUtils.isNotBlank(status)) {
             lambdaQueryWrapper.eq(MtGive::getStatus, status);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = givePage.getMerchantId();
+        if (merchantId != null) {
             lambdaQueryWrapper.eq(MtGive::getMerchantId, merchantId);
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotBlank(storeId)) {
+        Integer storeId = givePage.getStoreId();
+        if (storeId != null) {
             lambdaQueryWrapper.eq(MtGive::getStoreId, storeId);
         }
-        String userId = paginationRequest.getSearchParams().get("userId") == null ? "" : paginationRequest.getSearchParams().get("userId").toString();
-        if (StringUtils.isNotBlank(userId)) {
+        Integer userId = givePage.getUserId();
+        if (userId != null) {
             lambdaQueryWrapper.eq(MtGive::getUserId, userId);
         }
-        String giveUserId = paginationRequest.getSearchParams().get("giveUserId") == null ? "" : paginationRequest.getSearchParams().get("giveUserId").toString();
-        if (StringUtils.isNotBlank(giveUserId)) {
+        Integer giveUserId = givePage.getGiveUserId();
+        if (giveUserId != null) {
             lambdaQueryWrapper.eq(MtGive::getGiveUserId, giveUserId);
         }
-        String couponId = paginationRequest.getSearchParams().get("couponId") == null ? "" : paginationRequest.getSearchParams().get("couponId").toString();
+        String couponId = givePage.getCouponId();
         if (StringUtils.isNotBlank(couponId)) {
             lambdaQueryWrapper.eq(MtGive::getCouponIds, couponId);
         }
-        String mobile = paginationRequest.getSearchParams().get("mobile") == null ? "" : paginationRequest.getSearchParams().get("mobile").toString();
+        String mobile = givePage.getMobile();
         if (StringUtils.isNotBlank(mobile)) {
             lambdaQueryWrapper.eq(MtGive::getMobile, mobile);
         }
-        String userMobile = paginationRequest.getSearchParams().get("userMobile") == null ? "" : paginationRequest.getSearchParams().get("userMobile").toString();
-        if (StringUtils.isNotBlank(mobile)) {
+        String userMobile = givePage.getUserMobile();
+        if (StringUtils.isNotBlank(userMobile)) {
             lambdaQueryWrapper.eq(MtGive::getUserMobile, userMobile);
         }
 
@@ -133,7 +135,7 @@ public class GiveServiceImpl extends ServiceImpl<MtGiveMapper, MtGive> implement
              dataList.add(giveDto);
         }
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(givePage.getPage(), givePage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<GiveDto> paginationResponse = new PaginationResponse(pageImpl, GiveDto.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -211,36 +213,40 @@ public class GiveServiceImpl extends ServiceImpl<MtGiveMapper, MtGive> implement
         List<String> groupNames = new ArrayList<>();
 
         for (String id : couponIds) {
-            MtUserCoupon userCoupon = mtUserCouponMapper.selectById(Integer.parseInt(id));
-            MtCoupon coupon = couponService.queryCouponById(userCoupon.getCouponId());
-            if (!couponIdList.contains(coupon.getId().toString())) {
-                couponIdList.add(coupon.getId().toString());
-            }
-            if (!couponNames.contains(coupon.getName())) {
-                couponNames.add(coupon.getName());
-            }
-            MtCouponGroup group = couponGroupService.queryCouponGroupById(coupon.getGroupId());
-            if (!groupIds.contains(group.getId().toString())) {
-                groupIds.add(group.getId().toString());
-            }
-            if (!groupNames.contains(group.getName())) {
-                groupNames.add(group.getName());
-            }
-            money = money.add(userCoupon.getAmount());
-            if (null == userCoupon) {
-                throw new BusinessCheckException("转增卡券不存在");
-            } else {
+             MtUserCoupon userCoupon = mtUserCouponMapper.selectById(Integer.parseInt(id));
+             if (userCoupon == null) {
+                 throw new BusinessCheckException("转增卡券不存在");
+             } else {
                 if (!userCoupon.getStatus().equals(StatusEnum.ENABLED.getKey())) {
                     throw new BusinessCheckException("转增卡券必须是未使用状态");
                 }
-                if (!userCoupon.getUserId().toString().equals(userId.toString())) {
+                if (userCoupon.getUserId() == null || userCoupon.getUserId() <= 0 || !userCoupon.getUserId().equals(userId)) {
                     throw new BusinessCheckException("您的券可能已经转赠出去了");
                 }
-            }
+             }
+             MtCoupon coupon = couponService.queryCouponById(userCoupon.getCouponId());
+             if (coupon.getLimitNum() != null && coupon.getLimitNum() > 0) {
+                 Long count = mtUserCouponMapper.selectCount(Wrappers.lambdaQuery(MtUserCoupon.class).eq(MtUserCoupon::getCouponId, coupon.getId()).eq(MtUserCoupon::getUserId, user.getId()));
+                 if (count > coupon.getLimitNum()) {
+                     throw new BusinessCheckException("受赠对象拥有该卡券数量已达上限");
+                 }
+             }
+             if (!couponIdList.contains(coupon.getId().toString())) {
+                 couponIdList.add(coupon.getId().toString());
+             }
+             if (!couponNames.contains(coupon.getName())) {
+                 couponNames.add(coupon.getName());
+             }
+             MtCouponGroup group = couponGroupService.queryCouponGroupById(coupon.getGroupId());
+             if (!groupIds.contains(group.getId().toString())) {
+                 groupIds.add(group.getId().toString());
+             }
+             if (!groupNames.contains(group.getName())) {
+                 groupNames.add(group.getName());
+             }
+             money = money.add(userCoupon.getAmount());
         }
-
         MtUser myUser = memberService.queryMemberById(userId);
-
         give.setMobile(mobile);
         give.setGiveUserId(userId);
         give.setUserId(user.getId());
@@ -273,20 +279,18 @@ public class GiveServiceImpl extends ServiceImpl<MtGiveMapper, MtGive> implement
         MtGive giveInfo = mtGiveMapper.selectById(give.getId());
 
         for (String id : couponIds) {
-            MtUserCoupon userCoupon = mtUserCouponMapper.selectById(Integer.parseInt(id));
-            userCoupon.setUserId(user.getId());
-            userCoupon.setUpdateTime(new Date());
-            userCoupon.setMobile(user.getMobile());
-            mtUserCouponMapper.updateById(userCoupon);
-
-            MtGiveItem item = new MtGiveItem();
-            item.setCreateTime(new Date());
-            item.setGiveId(giveInfo.getId());
-            item.setStatus(StatusEnum.ENABLED.getKey());
-            item.setUpdateTime(new Date());
-            item.setUserCouponId(Integer.parseInt(id));
-
-            mtGiveItemMapper.insert(item);
+             MtUserCoupon userCoupon = mtUserCouponMapper.selectById(Integer.parseInt(id));
+             userCoupon.setUserId(user.getId());
+             userCoupon.setUpdateTime(new Date());
+             userCoupon.setMobile(user.getMobile());
+             mtUserCouponMapper.updateById(userCoupon);
+             MtGiveItem item = new MtGiveItem();
+             item.setCreateTime(new Date());
+             item.setGiveId(giveInfo.getId());
+             item.setStatus(StatusEnum.ENABLED.getKey());
+             item.setUpdateTime(new Date());
+             item.setUserCouponId(Integer.parseInt(id));
+             mtGiveItemMapper.insert(item);
         }
 
         try {
@@ -307,7 +311,6 @@ public class GiveServiceImpl extends ServiceImpl<MtGiveMapper, MtGive> implement
      * 根据ID获取转赠信息
      *
      * @param id ID
-     * @throws BusinessCheckException
      * @return
      */
     @Override

@@ -1,11 +1,13 @@
 package com.fuint.common.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.fuint.common.dto.StaffDto;
+import com.fuint.common.dto.merchant.StaffDto;
+import com.fuint.common.dto.system.AccountInfo;
+import com.fuint.common.param.StaffPage;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.model.MtStaff;
+
 import java.util.List;
 import java.util.Map;
 
@@ -20,39 +22,38 @@ public interface StaffService extends IService<MtStaff> {
     /**
      * 员工查询列表
      *
-     * @param paginationRequest
+     * @param staffPage
      * @return
      */
-    PaginationResponse<StaffDto> queryStaffListByPagination(PaginationRequest paginationRequest) throws BusinessCheckException;
+    PaginationResponse<StaffDto> queryStaffListByPagination(StaffPage staffPage);
 
     /**
      * 保存员工信息
      *
-     * @param reqStaff 员工信息
-     * @param operator 操作人
+     * @param mtStaff 员工信息
+     * @param accountInfo 操作人
      * @throws BusinessCheckException
      * @return
      */
-    MtStaff saveStaff(MtStaff reqStaff, String operator) throws BusinessCheckException;
+    MtStaff saveStaff(MtStaff mtStaff, AccountInfo accountInfo) throws BusinessCheckException;
 
     /**
      * 根据ID获取店铺信息
      *
      * @param  id 员工id
-     * @throws BusinessCheckException
+     * @return
      */
-    MtStaff queryStaffById(Integer id) throws BusinessCheckException;
+    MtStaff queryStaffById(Integer id);
 
     /**
      * 审核更改状态(禁用，审核通过)
      *
-     * @param  staffId 员工ID
+     * @param staffId 员工ID
      * @param status 状态
-     * @param operator 操作人
-     * @throws BusinessCheckException
+     * @param accountInfo 操作人
      * @return
      */
-    Integer updateAuditedStatus(Integer staffId, String status, String operator) throws BusinessCheckException;
+    Integer updateAuditedStatus(Integer staffId, String status, AccountInfo accountInfo) throws BusinessCheckException;
 
     /**
      * 根据条件搜索员工
@@ -60,32 +61,29 @@ public interface StaffService extends IService<MtStaff> {
      * @param params 请求参数
      * @return
      * */
-    List<MtStaff> queryStaffByParams(Map<String, Object> params) throws BusinessCheckException;
+    List<MtStaff> queryStaffByParams(Map<String, Object> params);
 
     /**
      * 根据手机号获取员工信息
      *
      * @param  mobile 手机
-     * @throws BusinessCheckException
      * @return
      */
-    MtStaff queryStaffByMobile(String mobile) throws BusinessCheckException;
+    MtStaff queryStaffByMobile(String mobile);
 
     /**
      * 根据会员ID获取员工信息
      *
      * @param userId 会员ID
-     * @throws BusinessCheckException
      * @return
      */
-    MtStaff queryStaffByUserId(Integer userId) throws BusinessCheckException;
+    MtStaff queryStaffByUserId(Integer userId);
 
     /**
      * 根据手机号获取员工信息
      *
      * @param  mobile 手机
-     * @throws BusinessCheckException
      * @return
      */
-    StaffDto getStaffInfoByMobile(String mobile) throws BusinessCheckException;
+    StaffDto getStaffInfoByMobile(String mobile);
 }

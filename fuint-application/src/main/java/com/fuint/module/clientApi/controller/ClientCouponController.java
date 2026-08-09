@@ -1,7 +1,7 @@
 package com.fuint.module.clientApi.controller;
 
-import com.fuint.common.dto.CouponDto;
-import com.fuint.common.dto.UserInfo;
+import com.fuint.common.dto.coupon.CouponDto;
+import com.fuint.common.dto.member.UserInfo;
 import com.fuint.common.enums.CouponExpireTypeEnum;
 import com.fuint.common.param.CouponInfoParam;
 import com.fuint.common.param.CouponListParam;
@@ -21,11 +21,11 @@ import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
+
 import javax.servlet.http.HttpServletRequest;
-import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 卡券接口controller
@@ -71,7 +71,7 @@ public class ClientCouponController extends BaseController {
     @CrossOrigin
     public ResponseObject list(HttpServletRequest request, @RequestBody CouponListParam params) throws BusinessCheckException {
         String merchantNo = request.getHeader("merchantNo") == null ? "" : request.getHeader("merchantNo");
-        UserInfo mtUser = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo mtUser = TokenUtil.getUserInfo();
         if (null != mtUser) {
             params.setUserId(mtUser.getId());
         }
@@ -89,8 +89,8 @@ public class ClientCouponController extends BaseController {
     @ApiOperation(value = "领取卡券")
     @RequestMapping(value = "/receive", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject receive(HttpServletRequest request, @RequestBody CouponReceiveParam couponReceiveParam) throws BusinessCheckException {
-        UserInfo mtUser = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+    public ResponseObject receive(@RequestBody CouponReceiveParam couponReceiveParam) throws BusinessCheckException {
+        UserInfo mtUser = TokenUtil.getUserInfo();
         if (null != mtUser) {
             couponReceiveParam.setUserId(mtUser.getId());
         } else {
@@ -109,8 +109,8 @@ public class ClientCouponController extends BaseController {
     @ApiOperation(value = "查询卡券详情")
     @RequestMapping(value = "/detail", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject detail(HttpServletRequest request, @RequestBody CouponInfoParam params) throws BusinessCheckException, InvocationTargetException, IllegalAccessException {
-        UserInfo mtUser = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+    public ResponseObject detail(@RequestBody CouponInfoParam params) throws BusinessCheckException {
+        UserInfo mtUser = TokenUtil.getUserInfo();
 
         Integer couponId = params.getCouponId() == null ? 0 : params.getCouponId();
         String userCouponCode = params.getUserCouponCode() == null ? "" : params.getUserCouponCode();

@@ -5,11 +5,12 @@ import com.fuint.framework.exception.BusinessCheckException;
 import com.fuint.framework.web.ResponseObject;
 import com.fuint.repository.model.MtOrder;
 import com.fuint.repository.model.MtUser;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.math.BigDecimal;
-import java.util.Map;
 import java.util.Date;
+import java.util.Map;
 
 /**
  * 微信相关业务接口
@@ -27,7 +28,7 @@ public interface WeixinService {
      * @param useCache 是否从缓存中读取
      * @return
      * */
-    String getAccessToken(Integer merchantId, boolean isMinApp, boolean useCache) throws BusinessCheckException;
+    String getAccessToken(Integer merchantId, boolean isMinApp, boolean useCache);
 
     /**
      * 提交预支付订单
@@ -180,9 +181,10 @@ public interface WeixinService {
      *
      * @param merchantId 商户ID
      * @param path 页面路径
+     * @param query 页面参数
      * @return
      * */
-    String createMiniAppLink(Integer merchantId, String path);
+    String createMiniAppLink(Integer merchantId, String path, String query);
 
     /**
      * 上传小程序发货信息

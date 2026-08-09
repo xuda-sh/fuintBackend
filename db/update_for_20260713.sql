@@ -1,0 +1,39 @@
+ALTER TABLE `mt_user` MODIFY COLUMN `PASSWORD` VARCHAR(64) DEFAULT '' COMMENT '密码';
+
+ALTER TABLE `mt_goods_sku`
+  ADD COLUMN `COUPON_IDS` VARCHAR (500) DEFAULT '' NULL COMMENT '附赠卡券ID，多个逗号隔开' AFTER `WEIGHT`;
+  
+DROP TABLE IF EXISTS `mt_stock_check`;
+
+CREATE TABLE `mt_stock_check` (
+  `ID` int NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+  `MERCHANT_ID` int DEFAULT '0' COMMENT '商户ID',
+  `STORE_ID` int NOT NULL DEFAULT '0' COMMENT '店铺ID',
+  `CHECK_NO` varchar(30) NOT NULL DEFAULT '' COMMENT '盘点单号',
+  `CHECK_TIME` datetime DEFAULT NULL COMMENT '盘点时间',
+  `DESCRIPTION` varchar(1000) DEFAULT '' COMMENT '备注说明',
+  `CREATE_TIME` datetime DEFAULT NULL COMMENT '创建时间',
+  `UPDATE_TIME` datetime DEFAULT NULL COMMENT '更新时间',
+  `OPERATOR` varchar(30) NOT NULL DEFAULT '' COMMENT '最后操作人',
+  `STATUS` char(1) NOT NULL DEFAULT 'A' COMMENT 'A：盘点中；B：已完成；D：已作废',
+  PRIMARY KEY (`ID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='库存盘点记录表';
+
+/*Table structure for table `mt_stock_check_item` */
+
+DROP TABLE IF EXISTS `mt_stock_check_item`;
+
+CREATE TABLE `mt_stock_check_item` (
+  `ID` int NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+  `CHECK_ID` int NOT NULL DEFAULT '0' COMMENT '盘点主表ID',
+  `GOODS_ID` int NOT NULL DEFAULT '0' COMMENT '商品ID',
+  `SKU_ID` int NOT NULL DEFAULT '0' COMMENT 'SKUID',
+  `SYSTEM_STOCK` decimal(10,2) DEFAULT '0.00' COMMENT '系统库存',
+  `ACTUAL_STOCK` decimal(10,2) DEFAULT '0.00' COMMENT '实际库存',
+  `DIFF_STOCK` decimal(10,2) DEFAULT '0.00' COMMENT '差异数量',
+  `DESCRIPTION` varchar(1000) DEFAULT '' COMMENT '说明备注',
+  `CREATE_TIME` datetime NOT NULL COMMENT '创建时间',
+  `UPDATE_TIME` datetime NOT NULL COMMENT '更新时间',
+  `STATUS` char(1) NOT NULL DEFAULT 'A' COMMENT '状态，A正常；D删除',
+  PRIMARY KEY (`ID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='库存盘点明细表';

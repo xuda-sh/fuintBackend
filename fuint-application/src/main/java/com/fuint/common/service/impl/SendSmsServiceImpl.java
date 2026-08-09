@@ -1,18 +1,27 @@
 package com.fuint.common.service.impl;
 
 import com.alibaba.fastjson.JSON;
+import com.aliyuncs.CommonRequest;
+import com.aliyuncs.CommonResponse;
+import com.aliyuncs.DefaultAcsClient;
+import com.aliyuncs.IAcsClient;
+import com.aliyuncs.exceptions.ClientException;
+import com.aliyuncs.exceptions.ServerException;
+import com.aliyuncs.http.MethodType;
+import com.aliyuncs.profile.DefaultProfile;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.fuint.common.dto.MessageResDto;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fuint.common.dto.message.MessageResDto;
 import com.fuint.common.enums.SettingTypeEnum;
 import com.fuint.common.enums.SmsSettingEnum;
 import com.fuint.common.enums.StatusEnum;
+import com.fuint.common.param.SmsPage;
 import com.fuint.common.service.SendSmsService;
 import com.fuint.common.service.SettingService;
 import com.fuint.common.service.SmsTemplateService;
 import com.fuint.common.util.CommonUtil;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.mapper.MtSmsSendedLogMapper;
 import com.fuint.repository.model.MtSetting;
@@ -25,21 +34,17 @@ import lombok.AllArgsConstructor;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import com.aliyuncs.DefaultAcsClient;
-import com.aliyuncs.IAcsClient;
-import com.aliyuncs.CommonRequest;
-import com.aliyuncs.CommonResponse;
-import com.aliyuncs.exceptions.ClientException;
-import com.aliyuncs.exceptions.ServerException;
-import com.aliyuncs.http.MethodType;
-import com.aliyuncs.profile.DefaultProfile;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.util.CollectionUtils;
-import java.util.*;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -49,7 +54,7 @@ import java.util.stream.Collectors;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class SendSmsServiceImpl implements SendSmsService {
 
     private static final Logger logger = LoggerFactory.getLogger(SendSmsServiceImpl.class);
@@ -205,7 +210,7 @@ public class SendSmsServiceImpl implements SendSmsService {
                     ObjectMapper mapper = new ObjectMapper();
                     paramJson = mapper.writeValueAsString(contentParams);
                 } catch(Exception e){
-                    e.printStackTrace();
+                    logger.error("短信参数序列化异常", e);
                 }
             }
 
@@ -227,11 +232,15 @@ public class SendSmsServiceImpl implements SendSmsService {
                 res = response.getData();
                 System.out.println(response.getData());
             } catch (ServerException e) {
-                e.printStackTrace();
+                logger.error("阿里云短信服务端异常", e);
             } catch (ClientException e) {
-                e.printStackTrace();
+                logger.error("阿里云短信客户端异常", e);
             }
             logger.info("sendMessage outParams:{}", res);
+            logger.info("smsContent:{}", smsContent);
+            logger.info("SignName:{}", signName);
+            logger.info("TemplateCode:{}", templateInfo.getCode());
+            logger.info("TemplateParam:{}", paramJson);
             saveSendLog(merchantId, phoneNo, smsContent);
             flag = true;
         } catch (Exception e) {
@@ -266,26 +275,26 @@ public class SendSmsServiceImpl implements SendSmsService {
     /**
      * 分页查询已发短信列表
      *
-     * @param paginationRequest
+     * @param smsPage
      * @return
      */
     @Override
-    public PaginationResponse<MtSmsSendedLog> querySmsListByPagination(PaginationRequest paginationRequest) {
-        Page<MtSmsSendedLog> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<MtSmsSendedLog> querySmsListByPagination(SmsPage smsPage) {
+        Page<MtSmsSendedLog> pageHelper = PageHelper.startPage(smsPage.getPage(), smsPage.getPageSize());
         LambdaQueryWrapper<MtSmsSendedLog> lambdaQueryWrapper = Wrappers.lambdaQuery();
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = smsPage.getMerchantId();
+        if (merchantId != null && merchantId > 0) {
             lambdaQueryWrapper.eq(MtSmsSendedLog::getMerchantId, merchantId);
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotBlank(storeId)) {
+        Integer storeId = smsPage.getStoreId();
+        if (storeId != null && storeId > 0) {
             lambdaQueryWrapper.eq(MtSmsSendedLog::getStoreId, storeId);
         }
-        String content = paginationRequest.getSearchParams().get("content") == null ? "" : paginationRequest.getSearchParams().get("content").toString();
+        String content = smsPage.getContent();
         if (StringUtils.isNotBlank(content)) {
             lambdaQueryWrapper.like(MtSmsSendedLog::getContent, content);
         }
-        String mobile = paginationRequest.getSearchParams().get("mobile") == null ? "" : paginationRequest.getSearchParams().get("mobile").toString();
+        String mobile = smsPage.getMobile();
         if (StringUtils.isNotBlank(mobile)) {
             lambdaQueryWrapper.eq(MtSmsSendedLog::getMobilePhone, mobile);
         }
@@ -293,7 +302,7 @@ public class SendSmsServiceImpl implements SendSmsService {
         lambdaQueryWrapper.orderByDesc(MtSmsSendedLog::getLogId);
         List<MtSmsSendedLog> dataList = mtSmsSendedLogMapper.selectList(lambdaQueryWrapper);
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(smsPage.getPage(), smsPage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<MtSmsSendedLog> paginationResponse = new PaginationResponse(pageImpl, MtSmsSendedLog.class);
         paginationResponse.setTotalPages(pageHelper.getPages());

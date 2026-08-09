@@ -3,28 +3,29 @@ package com.fuint.common.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fuint.common.dto.system.AccountInfo;
 import com.fuint.common.enums.StatusEnum;
 import com.fuint.common.enums.UserGradeCatchTypeEnum;
+import com.fuint.common.param.UserGradePage;
 import com.fuint.common.service.UserGradeService;
 import com.fuint.framework.annoation.OperationServiceLog;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.mapper.MtStaffMapper;
 import com.fuint.repository.mapper.MtUserGradeMapper;
-import com.fuint.repository.model.MtBanner;
 import com.fuint.repository.model.MtStaff;
 import com.fuint.repository.model.MtUser;
 import com.fuint.repository.model.MtUserGrade;
-import com.fuint.utils.StringUtil;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import lombok.AllArgsConstructor;
 import org.apache.commons.lang.StringUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -37,7 +38,7 @@ import java.util.Map;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class UserGradeServiceImpl extends ServiceImpl<MtUserGradeMapper, MtUserGrade> implements UserGradeService {
 
     private MtUserGradeMapper mtUserGradeMapper;
@@ -47,38 +48,38 @@ public class UserGradeServiceImpl extends ServiceImpl<MtUserGradeMapper, MtUserG
     /**
      * 分页查询会员等级列表
      *
-     * @param paginationRequest
+     * @param userGradePage
      * @return
      */
     @Override
-    public PaginationResponse<MtUserGrade> queryUserGradeListByPagination(PaginationRequest paginationRequest) {
-        Page<MtUserGrade> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<MtUserGrade> queryUserGradeListByPagination(UserGradePage userGradePage) {
+        Page<MtUserGrade> pageHelper = PageHelper.startPage(userGradePage.getPage(), userGradePage.getPageSize());
         LambdaQueryWrapper<MtUserGrade> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtUserGrade::getStatus, StatusEnum.DISABLE.getKey());
 
-        String name = paginationRequest.getSearchParams().get("name") == null ? "" : paginationRequest.getSearchParams().get("name").toString();
+        String name = userGradePage.getName();
         if (StringUtils.isNotBlank(name)) {
             lambdaQueryWrapper.like(MtUserGrade::getName, name);
         }
-        String catchType = paginationRequest.getSearchParams().get("catchType") == null ? "" : paginationRequest.getSearchParams().get("catchType").toString();
+        String catchType = userGradePage.getCatchType();
         if (StringUtils.isNotBlank(catchType)) {
             lambdaQueryWrapper.like(MtUserGrade::getCatchType, catchType);
         }
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = userGradePage.getStatus();
         if (StringUtils.isNotBlank(status)) {
             lambdaQueryWrapper.eq(MtUserGrade::getStatus, status);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = userGradePage.getMerchantId();
+        if (merchantId != null && merchantId > 0) {
             lambdaQueryWrapper.eq(MtUserGrade::getMerchantId, merchantId);
         }
 
         lambdaQueryWrapper.orderByDesc(MtUserGrade::getGrade);
         List<MtUserGrade> dataList = mtUserGradeMapper.selectList(lambdaQueryWrapper);
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(userGradePage.getPage(), userGradePage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
-        PaginationResponse<MtUserGrade> paginationResponse = new PaginationResponse(pageImpl, MtBanner.class);
+        PaginationResponse<MtUserGrade> paginationResponse = new PaginationResponse(pageImpl, MtUserGrade.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
         paginationResponse.setTotalElements(pageHelper.getTotal());
         paginationResponse.setContent(dataList);
@@ -104,6 +105,12 @@ public class UserGradeServiceImpl extends ServiceImpl<MtUserGradeMapper, MtUserG
         }
         if (mtUserGrade.getDiscount() != null && (mtUserGrade.getDiscount() > 10 || mtUserGrade.getDiscount() < 0)) {
             throw new BusinessCheckException("会员折扣需在0和10之间");
+        }
+        if (mtUserGrade.getRebate() != null && (mtUserGrade.getRebate() > 10 || mtUserGrade.getRebate() < 0)) {
+            throw new BusinessCheckException("返利比例需在0和10之间");
+        }
+        if (mtUserGrade.getStatus() == null) {
+            mtUserGrade.setStatus(StatusEnum.ENABLED.getKey());
         }
         mtUserGradeMapper.insert(mtUserGrade);
         return mtUserGrade;
@@ -145,6 +152,9 @@ public class UserGradeServiceImpl extends ServiceImpl<MtUserGradeMapper, MtUserG
         if (mtUserGrade.getDiscount() != null && (mtUserGrade.getDiscount() > 10 || mtUserGrade.getDiscount() < 0)) {
             throw new BusinessCheckException("会员折扣需在0和10之间");
         }
+        if (mtUserGrade.getRebate() != null && (mtUserGrade.getRebate() > 10 || mtUserGrade.getRebate() < 0)) {
+            throw new BusinessCheckException("返利比例需在0和10之间");
+        }
         if (mtUserGrade.getGrade() != null && (mtUserGrade.getGrade() <= 0)) {
             throw new BusinessCheckException("会员等级需大于0");
         }
@@ -160,16 +170,19 @@ public class UserGradeServiceImpl extends ServiceImpl<MtUserGradeMapper, MtUserG
      * 根据ID删除会员等级
      *
      * @param id ID
-     * @param operator 操作人
+     * @param accountInfo 操作人
      * @return
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @OperationServiceLog(description = "删除会员等级")
-    public Integer deleteUserGrade(Integer id, String operator) {
+    public Integer deleteUserGrade(Integer id, AccountInfo accountInfo) throws BusinessCheckException {
         MtUserGrade mtUserGrade = queryUserGradeById(0, id, 0);
         if (null == mtUserGrade) {
             return 0;
+        }
+        if (accountInfo.getMerchantId() > 0 && !mtUserGrade.getMerchantId().equals(accountInfo.getMerchantId())) {
+            throw new BusinessCheckException("不同商户，没有操作权限");
         }
         mtUserGrade.setStatus(StatusEnum.DISABLE.getKey());
         mtUserGradeMapper.updateById(mtUserGrade);
@@ -252,12 +265,12 @@ public class UserGradeServiceImpl extends ServiceImpl<MtUserGradeMapper, MtUserG
     /**
      * 获取商户会员等级列表
      *
-     * @param  merchantId
-     * @throws BusinessCheckException
+     * @param  merchantId 商户ID
+     * @param  status 状态
      * @return
      * */
     @Override
-    public List<MtUserGrade> getMerchantGradeList(Integer merchantId) {
-        return mtUserGradeMapper.getMerchantGradeList(merchantId);
+    public List<MtUserGrade> getMerchantGradeList(Integer merchantId, String status) {
+        return mtUserGradeMapper.getMerchantGradeList(merchantId, status);
     }
 }

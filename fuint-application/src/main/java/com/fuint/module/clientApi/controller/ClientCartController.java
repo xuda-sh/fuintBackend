@@ -1,7 +1,7 @@
 package com.fuint.module.clientApi.controller;
 
-import com.fuint.common.dto.AccountInfo;
-import com.fuint.common.dto.UserInfo;
+import com.fuint.common.dto.member.UserInfo;
+import com.fuint.common.dto.system.AccountInfo;
 import com.fuint.common.enums.OrderModeEnum;
 import com.fuint.common.enums.StatusEnum;
 import com.fuint.common.enums.YesOrNoEnum;
@@ -22,6 +22,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -85,7 +86,7 @@ public class ClientCartController extends BaseController {
         String hangNo = saveParam.getHangNo() == null ? "" : saveParam.getHangNo();
         Integer userId = saveParam.getUserId() == null ? 0 : saveParam.getUserId(); // 指定会员ID
 
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo userInfo = TokenUtil.getUserInfo();
         MtUser mtUser;
         if (userInfo == null) {
             mtUser = memberService.getCurrentUserInfo(request, userId, request.getHeader("Access-Token"));
@@ -94,7 +95,7 @@ public class ClientCartController extends BaseController {
         }
 
         if (mtUser == null && StringUtil.isNotEmpty(request.getHeader("Access-Token"))) {
-            AccountInfo accountInfo = TokenUtil.getAccountInfoByToken(request.getHeader("Access-Token"));
+            AccountInfo accountInfo = TokenUtil.getAccountInfo();
             if (accountInfo != null) {
                 if (accountInfo.getMerchantId() == null || accountInfo.getMerchantId() <= 0) {
                     return getFailureResult(5002);
@@ -130,7 +131,7 @@ public class ClientCartController extends BaseController {
             merchantId = mtUser.getMerchantId();
         }
         if (merchantId <= 0) {
-            AccountInfo accountInfo = TokenUtil.getAccountInfoByToken(request.getHeader("Access-Token"));
+            AccountInfo accountInfo = TokenUtil.getAccountInfo();
             if (accountInfo != null) {
                 merchantId = accountInfo.getMerchantId();
                 if (merchantId == null || merchantId <= 0) {
@@ -171,7 +172,7 @@ public class ClientCartController extends BaseController {
         Integer userId = clearParam.getUserId() == null ? 0 : clearParam.getUserId();
         String hangNo = clearParam.getHangNo() == null ? "" : clearParam.getHangNo();
 
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo userInfo = TokenUtil.getUserInfo();
         MtUser mtUser;
         if (userInfo == null) {
             mtUser = memberService.getCurrentUserInfo(request, userId, request.getHeader("Access-Token"));
@@ -233,7 +234,7 @@ public class ClientCartController extends BaseController {
         result.put("memberDiscount", 0);
 
         Map<String, Object> param = new HashMap<>();
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo userInfo = TokenUtil.getUserInfo();
         MtUser mtUser;
         // 没有会员信息，则查询是否是后台收银员下单
         if (userInfo == null) {
@@ -308,7 +309,7 @@ public class ClientCartController extends BaseController {
         if (merchantId <= 0) {
             merchantId = mtUser.getMerchantId();
         }
-        result = orderService.calculateCartGoods(merchantId, mtUser.getId(), cartList, userCouponId, isUsePoint, platform, orderMode);
+        result = orderService.calculateCartGoods(merchantId, mtUser.getId(), cartList, userCouponId, isUsePoint, platform, orderMode, params.getCouponIds());
 
         return getSuccessResult(result);
     }

@@ -1,12 +1,12 @@
 package com.fuint.common.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.fuint.framework.pagination.PaginationRequest;
-import com.fuint.framework.pagination.PaginationResponse;
+import com.fuint.common.param.BookCatePage;
 import com.fuint.framework.exception.BusinessCheckException;
+import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.model.MtBookCate;
+
 import java.util.List;
-import java.util.Map;
 
 /**
  * 预约类别业务接口
@@ -19,10 +19,10 @@ public interface BookCateService extends IService<MtBookCate> {
     /**
      * 分页查询列表
      *
-     * @param paginationRequest
+     * @param bookCatePage
      * @return
      */
-    PaginationResponse<MtBookCate> queryBookCateListByPagination(PaginationRequest paginationRequest) throws BusinessCheckException;
+    PaginationResponse<MtBookCate> queryBookCateListByPagination(BookCatePage bookCatePage);
 
     /**
      * 添加预约类别
@@ -37,10 +37,9 @@ public interface BookCateService extends IService<MtBookCate> {
      * 根据ID获取预约类别
      *
      * @param  id 预约分类ID
-     * @throws BusinessCheckException
      * @return
      */
-    MtBookCate getBookCateById(Integer id) throws BusinessCheckException;
+    MtBookCate getBookCateById(Integer id);
 
     /**
      * 更新预约类别
@@ -52,12 +51,12 @@ public interface BookCateService extends IService<MtBookCate> {
     MtBookCate updateBookCate(MtBookCate mtBookCate) throws BusinessCheckException;
 
     /**
-     * 根据条件搜索预约类别
+     * 获取可用的预约类别
      *
-     * @param  params 查询参数
-     * @throws BusinessCheckException
+     * @param  merchantId 商户ID
+     * @param  storeId 店铺ID
      * @return
      * */
-    List<MtBookCate> queryBookCateListByParams(Map<String, Object> params) throws BusinessCheckException;
+    List<MtBookCate> getAvailableBookCate(Integer merchantId, Integer storeId);
 
 }

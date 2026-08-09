@@ -1,0 +1,1 @@
+ALTER TABLE mt_goods ADD COLUMN `GRADE_IDS` varchar(500) DEFAULT '' COMMENT '会员等级限制，逗号分隔的等级ID，空表示不限';

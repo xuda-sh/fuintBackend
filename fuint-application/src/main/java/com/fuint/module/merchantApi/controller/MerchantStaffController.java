@@ -1,27 +1,26 @@
 package com.fuint.module.merchantApi.controller;
 
-import com.fuint.common.dto.UserInfo;
+import com.fuint.common.dto.member.UserInfo;
+import com.fuint.common.dto.system.AccountInfo;
+import com.fuint.common.param.StaffPage;
 import com.fuint.common.param.StaffParam;
+import com.fuint.common.service.MemberService;
 import com.fuint.common.service.MerchantService;
 import com.fuint.common.service.StaffService;
-import com.fuint.common.service.MemberService;
 import com.fuint.common.util.TokenUtil;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.framework.web.BaseController;
 import com.fuint.framework.web.ResponseObject;
-import com.fuint.module.merchantApi.request.StaffListRequest;
 import com.fuint.repository.model.MtStaff;
 import com.fuint.repository.model.MtUser;
 import com.fuint.utils.StringUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
+
 import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
@@ -56,8 +55,8 @@ public class MerchantStaffController extends BaseController {
     @ApiOperation(value = "员工列表")
     @RequestMapping(value = "/staffList", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject staffList(HttpServletRequest request, @RequestBody StaffListRequest requestParams) throws BusinessCheckException {
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+    public ResponseObject staffList(HttpServletRequest request, @RequestBody StaffPage staffPage) {
+        UserInfo userInfo = TokenUtil.getUserInfo();
         MtUser mtUser = memberService.queryMemberById(userInfo.getId());
 
         if (mtUser == null || StringUtil.isBlank(mtUser.getMobile())) {
@@ -70,16 +69,13 @@ public class MerchantStaffController extends BaseController {
             return getFailureResult(201, "您没有操作权限");
         }
 
-        Map<String, Object> params = new HashMap<>();
-        params.put("merchantId", staff.getMerchantId());
+        staffPage.setMerchantId(staff.getMerchantId());
         if (staff.getStoreId() != null && staff.getStoreId() > 0) {
-            params.put("storeId", staff.getStoreId());
-        }
-        if (StringUtil.isNotEmpty(requestParams.getKeyword())) {
-            params.put("keyword", requestParams.getKeyword());
+            staffPage.setStoreId(staff.getStoreId());
         }
 
-        PaginationResponse paginationResponse = staffService.queryStaffListByPagination(new PaginationRequest(requestParams.getPage(), requestParams.getPageSize(), params));
+        PaginationResponse paginationResponse = staffService.queryStaffListByPagination(staffPage);
+
         Map<String, Object> result = new HashMap<>();
         result.put("content", paginationResponse.getContent());
         result.put("pageSize", paginationResponse.getPageSize());
@@ -96,8 +92,8 @@ public class MerchantStaffController extends BaseController {
     @ApiOperation(value = "查询员工详情")
     @RequestMapping(value = "/info", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject info(HttpServletRequest request, @RequestBody StaffParam params) throws BusinessCheckException {
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+    public ResponseObject info(@RequestBody StaffParam params) throws BusinessCheckException {
+        UserInfo userInfo = TokenUtil.getUserInfo();
 
         MtStaff myInfo = null;
         MtUser mtUser = memberService.queryMemberById(userInfo.getId());
@@ -119,7 +115,7 @@ public class MerchantStaffController extends BaseController {
     @CrossOrigin
     public ResponseObject saveStaff(HttpServletRequest request, @RequestBody StaffParam params) throws BusinessCheckException {
         Integer merchantId = merchantService.getMerchantId(request.getHeader("merchantNo"));
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo userInfo = TokenUtil.getUserInfo();
         MtUser mtUser = memberService.queryMemberById(userInfo.getId());
         if (mtUser == null || StringUtil.isBlank(mtUser.getMobile())) {
             return getFailureResult(201, "您的帐号不是商户，没有操作权限");
@@ -139,7 +135,10 @@ public class MerchantStaffController extends BaseController {
         if (staff.getStoreId() != null && staff.getStoreId() > 0) {
             mtStaff.setStoreId(staff.getStoreId());
         }
-        MtStaff staffInfo = staffService.saveStaff(mtStaff, staff.getRealName());
+        AccountInfo accountInfo = new AccountInfo();
+        accountInfo.setAccountName(staff.getRealName());
+        accountInfo.setMerchantId(staff.getMerchantId());
+        MtStaff staffInfo = staffService.saveStaff(mtStaff, accountInfo);
         return getSuccessResult(staffInfo);
     }
 }

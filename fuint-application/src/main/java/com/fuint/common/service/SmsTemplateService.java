@@ -1,9 +1,10 @@
 package com.fuint.common.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.fuint.common.dto.SmsTemplateDto;
+import com.fuint.common.dto.message.SmsTemplateDto;
+import com.fuint.common.dto.system.AccountInfo;
+import com.fuint.common.param.SmsTemplatePage;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.model.MtSmsTemplate;
 
@@ -21,38 +22,43 @@ public interface SmsTemplateService extends IService<MtSmsTemplate> {
     /**
      * 分页查询模板列表
      *
-     * @param paginationRequest
+     * @param smsTemplatePage
      * @return
      */
-    PaginationResponse<MtSmsTemplate> querySmsTemplateListByPagination(PaginationRequest paginationRequest) throws BusinessCheckException;
+    PaginationResponse<MtSmsTemplate> querySmsTemplateListByPagination(SmsTemplatePage smsTemplatePage);
 
     /**
      * 添加模板
      *
-     * @param reqSmsTemplateDto
+     * @param smsTemplateDto 短信模板
+     * @param accountInfo   登录账号信息
      * @throws BusinessCheckException
+     * @return
      */
-    MtSmsTemplate saveSmsTemplate(SmsTemplateDto reqSmsTemplateDto) throws BusinessCheckException;
+    MtSmsTemplate saveSmsTemplate(SmsTemplateDto smsTemplateDto, AccountInfo accountInfo) throws BusinessCheckException;
 
     /**
      * 删除短信模板
      * @param id
-     * @param operator
+     * @param accountInfo
      * @return
      * */
-    void deleteTemplate(Integer id, String operator) throws BusinessCheckException;
+    void deleteTemplate(Integer id, AccountInfo accountInfo);
 
     /**
      * 根据模板ID获取模板信息
      *
      * @param id ID
-     * @throws BusinessCheckException
+     * @return
      */
-    MtSmsTemplate querySmsTemplateById(Integer id) throws BusinessCheckException;
+    MtSmsTemplate querySmsTemplateById(Integer id);
 
     /**
      * 根据条件搜索模板
+     *
+     * @param params 搜索条件
+     * @return
      * */
-    List<MtSmsTemplate> querySmsTemplateByParams(Map<String, Object> params) throws BusinessCheckException;
+    List<MtSmsTemplate> querySmsTemplateByParams(Map<String, Object> params);
 
 }

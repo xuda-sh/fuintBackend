@@ -1,6 +1,6 @@
 package com.fuint.module.clientApi.controller;
 
-import com.fuint.common.dto.StoreInfo;
+import com.fuint.common.dto.merchant.StoreInfo;
 import com.fuint.common.service.StoreService;
 import com.fuint.framework.exception.BusinessCheckException;
 import com.fuint.framework.web.BaseController;
@@ -11,6 +11,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
 import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;

@@ -1,12 +1,14 @@
 package com.fuint.common.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.fuint.common.dto.StoreDto;
-import com.fuint.common.dto.StoreInfo;
+import com.fuint.common.dto.merchant.StoreDto;
+import com.fuint.common.dto.merchant.StoreInfo;
+import com.fuint.common.dto.system.AccountInfo;
+import com.fuint.common.param.StorePage;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.model.MtStore;
+
 import java.util.List;
 import java.util.Map;
 
@@ -21,62 +23,62 @@ public interface StoreService extends IService<MtStore> {
     /**
      * 分页查询店铺列表
      *
-     * @param paginationRequest
+     * @param storePage
      * @return
      */
-    PaginationResponse<StoreDto> queryStoreListByPagination(PaginationRequest paginationRequest) throws BusinessCheckException;
+    PaginationResponse<StoreDto> queryStoreListByPagination(StorePage storePage);
 
     /**
      * 保存店铺信息
      *
      * @param  reqStoreDto
+     * @param  accountInfo 操作人
      * @throws BusinessCheckException
+     * @return
      */
-    MtStore saveStore(StoreDto reqStoreDto) throws BusinessCheckException;
+    MtStore saveStore(StoreDto reqStoreDto, AccountInfo accountInfo) throws BusinessCheckException;
 
     /**
      * 获取系统默认店铺
      *
-     * @throws BusinessCheckException
+     * @param merchantNo 商户号
      * @return
      */
-    MtStore getDefaultStore(String merchantNo) throws BusinessCheckException;
+    MtStore getDefaultStore(String merchantNo);
 
     /**
      * 根据店铺ID获取店铺信息
      *
      * @param  id 店铺ID
-     * @throws BusinessCheckException
      * @return
      */
-    MtStore queryStoreById(Integer id) throws BusinessCheckException;
+    MtStore queryStoreById(Integer id);
 
     /**
      * 根据店铺名称获取店铺信息
      *
      * @param  storeName 店铺名称
-     * @throws BusinessCheckException
+     * @return
      */
-    StoreDto queryStoreByName(String storeName) throws BusinessCheckException;
+    StoreDto queryStoreByName(String storeName);
 
     /**
      * 根据店铺ID查询店铺信息
      *
      * @param  id 店铺ID
      * @return
-     * @throws BusinessCheckException
      */
-    StoreDto queryStoreDtoById(Integer id) throws BusinessCheckException;
+    StoreDto queryStoreDtoById(Integer id);
 
     /**
      * 更新店铺状态
      *
      * @param  id       店铺ID
-     * @param  operator 操作人
+     * @param  accountInfo 操作人
      * @param  status   状态
      * @throws BusinessCheckException
      */
-    void updateStatus(Integer id, String operator, String status) throws BusinessCheckException;
+    void updateStatus(Integer id, AccountInfo accountInfo, String status) throws BusinessCheckException;
 
     /**
      * 根据条件查询店铺列表
@@ -84,7 +86,16 @@ public interface StoreService extends IService<MtStore> {
      * @param params 查询参数
      * @return
      * */
-    List<MtStore> queryStoresByParams(Map<String, Object> params) throws BusinessCheckException;
+    List<MtStore> queryStoresByParams(Map<String, Object> params);
+
+    /**
+     * 根据ID获取店铺列表
+     *
+     * @param merchantId 商户ID
+     * @param storeIds 店铺ID列表
+     * @return
+     * */
+    List<MtStore> getStoreListByIds(Integer merchantId, List<Integer> storeIds);
 
     /**
      * 获取我的店铺列表
@@ -94,7 +105,7 @@ public interface StoreService extends IService<MtStore> {
      * @param status 状态
      * @return
      * */
-    List<MtStore> getMyStoreList(Integer merchantId, Integer storeId, String status) throws BusinessCheckException;
+    List<MtStore> getMyStoreList(Integer merchantId, Integer storeId, String status);
 
     /**
      * 根据距离远近查找店铺
@@ -105,7 +116,7 @@ public interface StoreService extends IService<MtStore> {
      * @param longitude 经度
      * @return
      * */
-    List<StoreInfo> queryByDistance(String merchantNo, String keyword, String latitude, String longitude) throws BusinessCheckException;
+    List<StoreInfo> queryByDistance(String merchantNo, String keyword, String latitude, String longitude);
 
     /**
      * 获取店铺名称
@@ -135,10 +146,10 @@ public interface StoreService extends IService<MtStore> {
     /**
      * 根据地址获取经纬度
      *
-     * @param addr 地址
+     * @param address 地址
      * @return
      * */
-    Map<String, Object> getLatAndLngByAddress(String addr);
+    Map<String, Object> getLatAndLngByAddress(String address);
 
     /**
      * 获取步行距离

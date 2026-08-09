@@ -3,30 +3,35 @@ package com.fuint.common.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fuint.common.dto.ArticleDto;
+import com.fuint.common.dto.content.ArticleDto;
+import com.fuint.common.dto.system.AccountInfo;
+import com.fuint.common.enums.StatusEnum;
+import com.fuint.common.param.ArticlePage;
 import com.fuint.common.service.ArticleService;
 import com.fuint.common.service.MerchantService;
+import com.fuint.common.service.SettingService;
 import com.fuint.common.service.StoreService;
 import com.fuint.common.util.CommonUtil;
 import com.fuint.framework.annoation.OperationServiceLog;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.mapper.MtArticleMapper;
 import com.fuint.repository.model.MtArticle;
-import com.fuint.common.service.SettingService;
-import com.fuint.common.enums.StatusEnum;
 import com.fuint.repository.model.MtStore;
+import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import lombok.AllArgsConstructor;
 import org.apache.commons.lang.StringUtils;
-import com.github.pagehelper.Page;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.*;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
 /**
  * 文章服务接口
@@ -35,7 +40,7 @@ import java.util.*;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class ArticleServiceImpl extends ServiceImpl<MtArticleMapper, MtArticle> implements ArticleService {
 
     private MtArticleMapper mtArticleMapper;
@@ -58,34 +63,34 @@ public class ArticleServiceImpl extends ServiceImpl<MtArticleMapper, MtArticle> 
     /**
      * 分页查询文章列表
      *
-     * @param paginationRequest
+     * @param articlePage
      * @return
      */
     @Override
-    public PaginationResponse<ArticleDto> queryArticleListByPagination(PaginationRequest paginationRequest) {
-        Page<MtArticle> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<ArticleDto> queryArticleListByPagination(ArticlePage articlePage) {
+        Page<MtArticle> pageHelper = PageHelper.startPage(articlePage.getPage(), articlePage.getPageSize());
         LambdaQueryWrapper<MtArticle> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtArticle::getStatus, StatusEnum.DISABLE.getKey());
 
-        String title = paginationRequest.getSearchParams().get("title") == null ? "" : paginationRequest.getSearchParams().get("title").toString();
+        String title = articlePage.getTitle();
         if (StringUtils.isNotBlank(title)) {
             lambdaQueryWrapper.like(MtArticle::getTitle, title);
         }
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = articlePage.getStatus();
         if (StringUtils.isNotBlank(status)) {
             lambdaQueryWrapper.eq(MtArticle::getStatus, status);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = articlePage.getMerchantId();
+        if (merchantId != null && merchantId > 0) {
             lambdaQueryWrapper.eq(MtArticle::getMerchantId, merchantId);
         }
-        String merchantNo = paginationRequest.getSearchParams().get("merchantNo") == null ? "" : paginationRequest.getSearchParams().get("merchantNo").toString();
+        String merchantNo = articlePage.getMerchantNo();
         Integer mchId = merchantService.getMerchantId(merchantNo);
         if (mchId > 0) {
             lambdaQueryWrapper.eq(MtArticle::getMerchantId, mchId);
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotBlank(storeId)) {
+        Integer storeId = articlePage.getStoreId();
+        if (storeId != null && storeId > 0) {
             lambdaQueryWrapper.and(wq -> wq
                     .eq(MtArticle::getStoreId, 0)
                     .or()
@@ -103,7 +108,7 @@ public class ArticleServiceImpl extends ServiceImpl<MtArticleMapper, MtArticle> 
              dataList.add(articleDto);
         }
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(articlePage.getPage(), articlePage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<ArticleDto> paginationResponse = new PaginationResponse(pageImpl, ArticleDto.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -193,15 +198,20 @@ public class ArticleServiceImpl extends ServiceImpl<MtArticleMapper, MtArticle> 
      * 编辑文章
      *
      * @param  articleDto 文章参数
+     * @param accountInfo 登录用户
      * @throws BusinessCheckException
+     * @return
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @OperationServiceLog(description = "编辑文章")
-    public MtArticle updateArticle(ArticleDto articleDto) throws BusinessCheckException {
+    public MtArticle updateArticle(ArticleDto articleDto, AccountInfo accountInfo) throws BusinessCheckException {
         MtArticle mtArticle = queryArticleById(articleDto.getId());
         if (mtArticle == null) {
             throw new BusinessCheckException("该文章状态异常");
+        }
+        if (accountInfo.getMerchantId() != null && !mtArticle.getMerchantId().equals(accountInfo.getMerchantId())) {
+            throw new BusinessCheckException("不同商户，无操作权限");
         }
         mtArticle.setId(articleDto.getId());
         if (articleDto.getImage() != null) {
@@ -240,48 +250,5 @@ public class ArticleServiceImpl extends ServiceImpl<MtArticleMapper, MtArticle> 
         mtArticle.setUpdateTime(new Date());
         mtArticleMapper.updateById(mtArticle);
         return mtArticle;
-    }
-
-    /**
-     * 根据条件搜索文章
-     *
-     * @param params 搜索条件
-     * @return
-     * */
-    @Override
-    public List<MtArticle> queryArticleListByParams(Map<String, Object> params) {
-        String status =  params.get("status") == null ? StatusEnum.ENABLED.getKey(): params.get("status").toString();
-        String storeId =  params.get("storeId") == null ? "" : params.get("storeId").toString();
-        String title = params.get("title") == null ? "" : params.get("title").toString();
-        String merchantId = params.get("merchantId") == null ? "" : params.get("merchantId").toString();
-
-        LambdaQueryWrapper<MtArticle> lambdaQueryWrapper = Wrappers.lambdaQuery();
-        if (StringUtils.isNotBlank(merchantId)) {
-            lambdaQueryWrapper.like(MtArticle::getMerchantId, merchantId);
-        }
-        if (StringUtils.isNotBlank(title)) {
-            lambdaQueryWrapper.like(MtArticle::getTitle, title);
-        }
-        if (StringUtils.isNotBlank(status)) {
-            lambdaQueryWrapper.eq(MtArticle::getStatus, status);
-        }
-        if (StringUtils.isNotBlank(storeId)) {
-            lambdaQueryWrapper.and(wq -> wq
-                              .eq(MtArticle::getStoreId, 0)
-                              .or()
-                              .eq(MtArticle::getStoreId, storeId));
-        }
-
-        lambdaQueryWrapper.orderByAsc(MtArticle::getSort);
-        List<MtArticle> dataList = mtArticleMapper.selectList(lambdaQueryWrapper);
-        String baseImage = settingService.getUploadBasePath();
-
-        if (dataList.size() > 0) {
-            for (MtArticle article : dataList) {
-                 article.setImage(baseImage + article.getImage());
-            }
-        }
-
-        return dataList;
     }
 }

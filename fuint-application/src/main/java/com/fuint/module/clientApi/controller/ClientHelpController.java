@@ -1,15 +1,15 @@
 package com.fuint.module.clientApi.controller;
 
-import com.fuint.common.dto.UserInfo;
-import com.fuint.common.util.TokenUtil;
 import com.fuint.framework.exception.BusinessCheckException;
 import com.fuint.framework.web.BaseController;
 import com.fuint.framework.web.ResponseObject;
-import com.fuint.utils.StringUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.web.bind.annotation.*;
-import javax.servlet.http.HttpServletRequest;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RestController;
+
 import java.util.ArrayList;
 
 /**
@@ -29,11 +29,7 @@ public class ClientHelpController extends BaseController {
     @ApiOperation(value = "查询帮助列表")
     @RequestMapping(value = "/list", method = RequestMethod.GET)
     @CrossOrigin
-    public ResponseObject list(HttpServletRequest request) throws BusinessCheckException {
-        UserInfo mtUser = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
-        if (null == mtUser) {
-            return getFailureResult(1001);
-        }
+    public ResponseObject list() throws BusinessCheckException {
         ArrayList<String> data = new ArrayList<>();
         return getSuccessResult(data);
     }

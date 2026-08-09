@@ -9,8 +9,7 @@ import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 
 /**
  * 会员个人信息
@@ -18,8 +17,7 @@ import lombok.Setter;
  * Created by FSQ
  * CopyRight https://www.fuint.cn
  */
-@Getter
-@Setter
+@Data
 @TableName("mt_user")
 @ApiModel(value = "MtUser对象", description = "会员个人信息")
 public class MtUser implements Serializable {
@@ -55,12 +53,12 @@ public class MtUser implements Serializable {
     private Integer gradeId;
 
     @ApiModelProperty("会员开始时间")
-    @TableField(strategy = FieldStrategy.IGNORED)
+    @TableField(whereStrategy = FieldStrategy.NOT_EMPTY)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date startTime;
 
     @ApiModelProperty("会员结束时间")
-    @TableField(strategy=FieldStrategy.IGNORED)
+    @TableField(whereStrategy = FieldStrategy.NOT_EMPTY)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date endTime;
 
@@ -108,6 +106,9 @@ public class MtUser implements Serializable {
 
     @ApiModelProperty("状态，A：激活；N：禁用；D：删除")
     private String status;
+
+    @ApiModelProperty("是否已完善资料 Y：是；N：否")
+    private String profileCompleted;
 
     @ApiModelProperty("备注信息")
     private String description;

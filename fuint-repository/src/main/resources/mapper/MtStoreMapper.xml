@@ -6,9 +6,9 @@
     </select>
 
     <update id="resetDefaultStore">
-        update mt_store p set p.IS_DEFAULT = 'N' where p.STATUS != 'D'
+        update mt_store set IS_DEFAULT = 'N' where STATUS != 'D'
         <if test="merchantId != null and merchantId != ''">
-            AND p.MERCHANT_ID = #{merchantId}
+            AND MERCHANT_ID = #{merchantId}
         </if>
     </update>
 
@@ -45,6 +45,20 @@
         </if>
         <if test="status != null and status != ''">
             AND t.STATUS = #{status}
+        </if>
+        ORDER BY t.IS_DEFAULT desc
+    </select>
+
+    <select id="getStoreListByIds" resultType="com.fuint.repository.model.MtStore">
+        select * from mt_store t where t.STATUS != 'D'
+        <if test="merchantId != null and merchantId != ''">
+            AND t.MERCHANT_ID = #{merchantId}
+        </if>
+        <if test="storeIds != null and storeIds.size() > 0">
+            AND t.ID in
+            <foreach collection="storeIds" item="storeId" separator="," open="(" close=")">
+                #{storeId}
+            </foreach>
         </if>
         ORDER BY t.IS_DEFAULT desc
     </select>

@@ -1,9 +1,14 @@
 package com.fuint.module.merchantApi.controller;
 
-import com.fuint.common.dto.*;
+import com.fuint.common.dto.coupon.ReqCouponDto;
+import com.fuint.common.dto.member.UserInfo;
+import com.fuint.common.dto.system.AccountInfo;
 import com.fuint.common.param.CouponListParam;
 import com.fuint.common.param.CouponReceiveParam;
-import com.fuint.common.service.*;
+import com.fuint.common.service.CouponService;
+import com.fuint.common.service.MemberService;
+import com.fuint.common.service.MerchantService;
+import com.fuint.common.service.StaffService;
 import com.fuint.common.util.TokenUtil;
 import com.fuint.framework.exception.BusinessCheckException;
 import com.fuint.framework.web.BaseController;
@@ -17,8 +22,8 @@ import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
+
 import javax.servlet.http.HttpServletRequest;
-import java.text.ParseException;
 
 /**
  * 商户卡券接口controller
@@ -55,9 +60,9 @@ public class MerchantCouponController extends BaseController {
     @ApiOperation(value = "获取卡券列表")
     @RequestMapping(value = "/couponList", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject couponList(HttpServletRequest request, @RequestBody CouponListParam params) throws BusinessCheckException {
+    public ResponseObject couponList(HttpServletRequest request, @RequestBody CouponListParam params) {
         Integer merchantId = merchantService.getMerchantId(request.getHeader("merchantNo"));
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo userInfo = TokenUtil.getUserInfo();
         MtUser mtUser = memberService.queryMemberById(userInfo.getId());
         MtStaff staff = staffService.queryStaffByMobile(mtUser.getMobile());
         if (staff == null || !merchantId.equals(staff.getMerchantId())) {
@@ -75,9 +80,9 @@ public class MerchantCouponController extends BaseController {
     @ApiOperation(value = "保存卡券信息")
     @RequestMapping(value = "/saveCoupon", method = RequestMethod.POST)
     @CrossOrigin
-    public ResponseObject saveCoupon(HttpServletRequest request, @RequestBody ReqCouponDto reqCouponDto) throws BusinessCheckException {
+    public ResponseObject saveCoupon(HttpServletRequest request, @RequestBody ReqCouponDto reqCouponDto) {
         Integer merchantId = merchantService.getMerchantId(request.getHeader("merchantNo"));
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo userInfo = TokenUtil.getUserInfo();
         if (userInfo == null || userInfo.getMobile() == null) {
             return getFailureResult(201, "您的帐号不是商户，没有操作权限");
         }
@@ -96,7 +101,7 @@ public class MerchantCouponController extends BaseController {
     @CrossOrigin
     public ResponseObject sendCoupon(HttpServletRequest request, @RequestBody CouponReceiveParam receiveParam) throws BusinessCheckException {
         Integer merchantId = merchantService.getMerchantId(request.getHeader("merchantNo"));
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+        UserInfo userInfo = TokenUtil.getUserInfo();
         if (userInfo == null || userInfo.getMobile() == null) {
             return getFailureResult(201, "您的帐号不是商户，没有操作权限");
         }
@@ -119,7 +124,13 @@ public class MerchantCouponController extends BaseController {
                 return getFailureResult(1003, "抱歉，该卡券存在店铺使用范围限制，您所在的店铺无发券权限！");
             }
         }
-        couponService.sendCoupon(receiveParam.getCouponId(), receiveParam.getUserId(), receiveParam.getNum(), true, null, staff.getRealName());
+        AccountInfo accountInfo = new AccountInfo();
+        accountInfo.setAccountName(staff.getRealName());
+        accountInfo.setMerchantId(staff.getMerchantId());
+        ResponseObject result = couponService.sendCoupon(receiveParam.getCouponId(), receiveParam.getUserId(), receiveParam.getNum(), true, null, accountInfo);
+        if (!result.getCode().equals(200)) {
+            return getFailureResult(result.getCode(), result.getMessage());
+        }
         return getSuccessResult(true);
     }
 }

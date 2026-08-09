@@ -1,0 +1,2 @@
+ALTER TABLE `mt_stock_item`
+  CHANGE `NUM` `NUM` DOUBLE (10, 2) DEFAULT 0 NOT NULL COMMENT '数量';

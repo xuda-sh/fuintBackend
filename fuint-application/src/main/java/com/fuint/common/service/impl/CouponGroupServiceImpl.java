@@ -3,21 +3,25 @@ package com.fuint.common.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fuint.common.dto.CouponCellDto;
-import com.fuint.common.dto.ReqCouponGroupDto;
-import com.fuint.common.dto.ReqSendLogDto;
+import com.fuint.common.dto.coupon.CouponCellDto;
+import com.fuint.common.dto.coupon.ReqCouponGroupDto;
+import com.fuint.common.dto.coupon.ReqSendLogDto;
+import com.fuint.common.dto.system.AccountInfo;
 import com.fuint.common.enums.StatusEnum;
+import com.fuint.common.param.CouponGroupPage;
 import com.fuint.common.service.*;
 import com.fuint.common.util.CommonUtil;
+import com.fuint.common.util.SeqUtil;
 import com.fuint.common.util.XlsUtil;
 import com.fuint.framework.annoation.OperationServiceLog;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.mapper.MtCouponGroupMapper;
 import com.fuint.repository.mapper.MtCouponMapper;
 import com.fuint.repository.mapper.MtUserCouponMapper;
-import com.fuint.repository.model.*;
+import com.fuint.repository.model.MtCoupon;
+import com.fuint.repository.model.MtCouponGroup;
+import com.fuint.repository.model.MtUser;
 import com.fuint.utils.StringUtil;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -31,9 +35,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.lang.String;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -78,40 +82,40 @@ public class CouponGroupServiceImpl extends ServiceImpl<MtCouponGroupMapper, MtC
     /**
      * 分页查询卡券分组列表
      *
-     * @param paginationRequest
+     * @param couponGroupPage
      * @return
      */
     @Override
-    public PaginationResponse<MtCouponGroup> queryCouponGroupListByPagination(PaginationRequest paginationRequest) {
-        Page<MtCouponGroup> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<MtCouponGroup> queryCouponGroupListByPagination(CouponGroupPage couponGroupPage) {
+        Page<MtCouponGroup> pageHelper = PageHelper.startPage(couponGroupPage.getPage(), couponGroupPage.getPageSize());
         LambdaQueryWrapper<MtCouponGroup> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtCouponGroup::getStatus, StatusEnum.DISABLE.getKey());
 
-        String name = paginationRequest.getSearchParams().get("name") == null ? "" : paginationRequest.getSearchParams().get("name").toString();
+        String name = couponGroupPage.getName();
         if (StringUtils.isNotBlank(name)) {
             lambdaQueryWrapper.like(MtCouponGroup::getName, name);
         }
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = couponGroupPage.getStatus();
         if (StringUtils.isNotBlank(status)) {
             lambdaQueryWrapper.eq(MtCouponGroup::getStatus, status);
         }
-        String id = paginationRequest.getSearchParams().get("id") == null ? "" : paginationRequest.getSearchParams().get("id").toString();
-        if (StringUtils.isNotBlank(id)) {
+        Integer id = couponGroupPage.getId();
+        if (id != null) {
             lambdaQueryWrapper.eq(MtCouponGroup::getId, id);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = couponGroupPage.getMerchantId();
+        if (merchantId != null) {
             lambdaQueryWrapper.eq(MtCouponGroup::getMerchantId, merchantId);
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotBlank(storeId)) {
+        Integer storeId = couponGroupPage.getStoreId();
+        if (storeId != null) {
             lambdaQueryWrapper.eq(MtCouponGroup::getStoreId, storeId);
         }
 
         lambdaQueryWrapper.orderByDesc(MtCouponGroup::getId);
         List<MtCouponGroup> dataList = mtCouponGroupMapper.selectList(lambdaQueryWrapper);
 
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(couponGroupPage.getPage(), couponGroupPage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<MtCouponGroup> paginationResponse = new PaginationResponse(pageImpl, MtCouponGroup.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -125,7 +129,7 @@ public class CouponGroupServiceImpl extends ServiceImpl<MtCouponGroupMapper, MtC
      * 添加卡券分组
      *
      * @param  reqCouponGroupDto
-     * @throws BusinessCheckException
+     * @return
      */
     @Override
     @OperationServiceLog(description = "新增卡券分组")
@@ -151,7 +155,7 @@ public class CouponGroupServiceImpl extends ServiceImpl<MtCouponGroupMapper, MtC
      * 根据分组ID获取卡券分组信息
      *
      * @param id 卡券分组ID
-     * @throws BusinessCheckException
+     * @return
      */
     @Override
     public MtCouponGroup queryCouponGroupById(Integer id) {
@@ -162,20 +166,23 @@ public class CouponGroupServiceImpl extends ServiceImpl<MtCouponGroupMapper, MtC
      * 根据ID删除卡券分组
      *
      * @param  id       分组ID
-     * @param  operator 操作人
+     * @param  accountInfo 操作人
      * @throws BusinessCheckException
+     * @return
      */
     @Override
     @OperationServiceLog(description = "删除卡券分组")
-    public void deleteCouponGroup(Integer id, String operator) {
+    public void deleteCouponGroup(Integer id, AccountInfo accountInfo) throws BusinessCheckException {
         MtCouponGroup couponGroup = queryCouponGroupById(id);
         if (null == couponGroup) {
-            return;
+            throw new BusinessCheckException("该分组不存在");
         }
-
+        if (accountInfo.getMerchantId() > 0 && !accountInfo.getMerchantId().equals(couponGroup.getMerchantId())) {
+            throw new BusinessCheckException("不同商户，无权限操作");
+        }
         couponGroup.setStatus(StatusEnum.DISABLE.getKey());
         couponGroup.setUpdateTime(new Date());
-        couponGroup.setOperator(operator);
+        couponGroup.setOperator(accountInfo.getAccountName());
 
         this.updateById(couponGroup);
     }
@@ -183,13 +190,15 @@ public class CouponGroupServiceImpl extends ServiceImpl<MtCouponGroupMapper, MtC
     /**
      * 修改卡券分组
      *
-     * @param reqCouponGroupDto
+     * @param  reqCouponGroupDto
+     * @param  accountInfo
      * @throws BusinessCheckException
+     * @return
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @OperationServiceLog(description = "更新卡券分组")
-    public MtCouponGroup updateCouponGroup(ReqCouponGroupDto reqCouponGroupDto) throws BusinessCheckException {
+    public MtCouponGroup updateCouponGroup(ReqCouponGroupDto reqCouponGroupDto, AccountInfo accountInfo) throws BusinessCheckException {
         MtCouponGroup couponGroup = queryCouponGroupById(reqCouponGroupDto.getId());
         if (null == couponGroup || StatusEnum.DISABLE.getKey().equalsIgnoreCase(couponGroup.getStatus())) {
             throw new BusinessCheckException("该分组不存在或已被删除");
@@ -215,8 +224,8 @@ public class CouponGroupServiceImpl extends ServiceImpl<MtCouponGroupMapper, MtC
     /**
      * 获取卡券种类数量
      *
-     * @param id
-     * @throws BusinessCheckException
+     * @param id 分组ID
+     * @return
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -229,7 +238,7 @@ public class CouponGroupServiceImpl extends ServiceImpl<MtCouponGroupMapper, MtC
      * 获取卡券总价值
      *
      * @param  groupId
-     * @throws BusinessCheckException
+     * @return
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -251,7 +260,7 @@ public class CouponGroupServiceImpl extends ServiceImpl<MtCouponGroupMapper, MtC
      * 获取已发放套数
      *
      * @param  couponId  卡券ID
-     * @throws BusinessCheckException
+     * @return
      * */
     @Override
     public Integer getSendNum(Integer couponId) {
@@ -263,12 +272,12 @@ public class CouponGroupServiceImpl extends ServiceImpl<MtCouponGroupMapper, MtC
      * 导入发券列表
      *
      * @param file excel文件
-     * @param operator 操作者
+     * @param accountInfo 操作者
      * */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @OperationServiceLog(description = "导入发券列表")
-    public String importSendCoupon(MultipartFile file, String operator, String filePath) throws BusinessCheckException {
+    public String importSendCoupon(MultipartFile file, AccountInfo accountInfo, String filePath) throws BusinessCheckException {
         String originalFileName = file.getOriginalFilename();
         boolean isExcel2003 = XlsUtil.isExcel2003(originalFileName);
         boolean isExcel2007 = XlsUtil.isExcel2007(originalFileName);
@@ -429,7 +438,7 @@ public class CouponGroupServiceImpl extends ServiceImpl<MtCouponGroupMapper, MtC
         }
 
         // 导入批次
-        String uuid = UUID.randomUUID().toString().replaceAll("-", "");
+        String uuid = SeqUtil.getUUID();
 
         // 至此，验证都通过了，开始发券
         try {
@@ -441,7 +450,7 @@ public class CouponGroupServiceImpl extends ServiceImpl<MtCouponGroupMapper, MtC
                 for (int gid = 0; gid < cellDto.getGroupId().size(); gid++) {
                     MtCouponGroup mtCouponGroup = getById(cellDto.getGroupId().get(gid).intValue());
                     MtUser mtUser = memberService.queryMemberByMobile(mtCouponGroup.getMerchantId(), cellDto.getMobile());
-                    couponService.sendCoupon(cellDto.getGroupId().get(gid).intValue(), mtUser.getId(), cellDto.getNum().get(gid), false, uuid, operator);
+                    couponService.sendCoupon(cellDto.getGroupId().get(gid).intValue(), mtUser.getId(), cellDto.getNum().get(gid), false, uuid, accountInfo);
                     List<MtCoupon> couponList = couponService.queryCouponListByGroupId(cellDto.getGroupId().get(gid).intValue());
                     // 累加总张数、总价值
                     for (MtCoupon coupon : couponList) {
@@ -464,7 +473,7 @@ public class CouponGroupServiceImpl extends ServiceImpl<MtCouponGroupMapper, MtC
                 dto.setCouponId(0);
                 dto.setGroupName("");
                 dto.setSendNum(0);
-                dto.setOperator(operator);
+                dto.setOperator(accountInfo.getAccountName());
                 dto.setUuid(uuid);
                 sendLogService.addSendLog(dto);
 

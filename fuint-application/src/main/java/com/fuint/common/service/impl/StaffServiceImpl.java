@@ -3,14 +3,15 @@ package com.fuint.common.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fuint.common.dto.StaffDto;
+import com.fuint.common.dto.merchant.StaffDto;
+import com.fuint.common.dto.system.AccountInfo;
 import com.fuint.common.enums.StatusEnum;
 import com.fuint.common.enums.YesOrNoEnum;
+import com.fuint.common.param.StaffPage;
 import com.fuint.common.service.*;
 import com.fuint.common.util.CommonUtil;
 import com.fuint.framework.annoation.OperationServiceLog;
 import com.fuint.framework.exception.BusinessCheckException;
-import com.fuint.framework.pagination.PaginationRequest;
 import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.mapper.MtStaffMapper;
 import com.fuint.repository.model.MtMerchant;
@@ -25,6 +26,7 @@ import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -39,7 +41,7 @@ import java.util.*;
  * CopyRight https://www.fuint.cn
  */
 @Service
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_= {@Lazy})
 public class StaffServiceImpl extends ServiceImpl<MtStaffMapper, MtStaff> implements StaffService {
 
     private static final Logger logger = LoggerFactory.getLogger(StaffServiceImpl.class);
@@ -69,40 +71,40 @@ public class StaffServiceImpl extends ServiceImpl<MtStaffMapper, MtStaff> implem
     /**
      * 员工查询列表
      *
-     * @param paginationRequest
+     * @param staffPage
      * @return
      */
     @Override
-    public PaginationResponse<StaffDto> queryStaffListByPagination(PaginationRequest paginationRequest) throws BusinessCheckException {
-        Page<MtStaff> pageHelper = PageHelper.startPage(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+    public PaginationResponse<StaffDto> queryStaffListByPagination(StaffPage staffPage) {
+        Page<MtStaff> pageHelper = PageHelper.startPage(staffPage.getPage(), staffPage.getPageSize());
         LambdaQueryWrapper<MtStaff> lambdaQueryWrapper = Wrappers.lambdaQuery();
         lambdaQueryWrapper.ne(MtStaff::getAuditedStatus, StatusEnum.DISABLE.getKey());
 
-        String name = paginationRequest.getSearchParams().get("name") == null ? "" : paginationRequest.getSearchParams().get("name").toString();
+        String name = staffPage.getRealName();
         if (StringUtils.isNotBlank(name)) {
             lambdaQueryWrapper.like(MtStaff::getRealName, name);
         }
-        String status = paginationRequest.getSearchParams().get("status") == null ? "" : paginationRequest.getSearchParams().get("status").toString();
+        String status = staffPage.getAuditedStatus();
         if (StringUtils.isNotBlank(status)) {
             lambdaQueryWrapper.eq(MtStaff::getAuditedStatus, status);
         }
-        String mobile = paginationRequest.getSearchParams().get("mobile") == null ? "" : paginationRequest.getSearchParams().get("mobile").toString();
+        String mobile = staffPage.getMobile();
         if (StringUtils.isNotBlank(mobile)) {
             lambdaQueryWrapper.eq(MtStaff::getMobile, mobile);
         }
-        String merchantId = paginationRequest.getSearchParams().get("merchantId") == null ? "" : paginationRequest.getSearchParams().get("merchantId").toString();
-        if (StringUtils.isNotBlank(merchantId)) {
+        Integer merchantId = staffPage.getMerchantId();
+        if (merchantId != null && merchantId > 0) {
             lambdaQueryWrapper.eq(MtStaff::getMerchantId, merchantId);
         }
-        String storeId = paginationRequest.getSearchParams().get("storeId") == null ? "" : paginationRequest.getSearchParams().get("storeId").toString();
-        if (StringUtils.isNotBlank(storeId)) {
+        Integer storeId = staffPage.getStoreId();
+        if (storeId != null && storeId > 0) {
             lambdaQueryWrapper.eq(MtStaff::getStoreId, storeId);
         }
-        String category = paginationRequest.getSearchParams().get("category") == null ? "" : paginationRequest.getSearchParams().get("category").toString();
-        if (StringUtils.isNotBlank(category)) {
+        Integer category = staffPage.getCategory();
+        if (category != null && category > 0) {
             lambdaQueryWrapper.eq(MtStaff::getCategory, category);
         }
-        String keyword = paginationRequest.getSearchParams().get("keyword") == null ? "" : paginationRequest.getSearchParams().get("keyword").toString();
+        String keyword = staffPage.getKeyword();
         if (StringUtils.isNotBlank(keyword)) {
             lambdaQueryWrapper.and(wq -> wq
                     .eq(MtStaff::getMobile, keyword)
@@ -125,7 +127,7 @@ public class StaffServiceImpl extends ServiceImpl<MtStaffMapper, MtStaff> implem
                  dataList.add(staffDto);
             }
         }
-        PageRequest pageRequest = PageRequest.of(paginationRequest.getCurrentPage(), paginationRequest.getPageSize());
+        PageRequest pageRequest = PageRequest.of(staffPage.getPage(), staffPage.getPageSize());
         PageImpl pageImpl = new PageImpl(dataList, pageRequest, pageHelper.getTotal());
         PaginationResponse<StaffDto> paginationResponse = new PaginationResponse(pageImpl, StaffDto.class);
         paginationResponse.setTotalPages(pageHelper.getPages());
@@ -139,14 +141,14 @@ public class StaffServiceImpl extends ServiceImpl<MtStaffMapper, MtStaff> implem
      * 保存员工信息
      *
      * @param  mtStaff 员工参数
-     * @param operator 操作人
+     * @param  accountInfo 操作人
      * @throws BusinessCheckException
      * @return
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @OperationServiceLog(description = "保存店铺员工")
-    public MtStaff saveStaff(MtStaff mtStaff, String operator) throws BusinessCheckException {
+    public MtStaff saveStaff(MtStaff mtStaff, AccountInfo accountInfo) throws BusinessCheckException {
         mtStaff.setUpdateTime(new Date());
         if (mtStaff.getId() == null || mtStaff.getId() <= 0) {
             mtStaff.setCreateTime(new Date());
@@ -165,6 +167,10 @@ public class StaffServiceImpl extends ServiceImpl<MtStaffMapper, MtStaff> implem
             mtStaff.setMerchantId(mtStaffOld.getMerchantId());
         }
 
+        if (!mtStaff.getMerchantId().equals(accountInfo.getMerchantId())) {
+            throw new BusinessCheckException("没有操作权限");
+        }
+
         MtUser mtUser = null;
         if (mtStaff.getUserId() != null) {
             mtUser = memberService.queryMemberById(mtStaff.getUserId());
@@ -178,7 +184,7 @@ public class StaffServiceImpl extends ServiceImpl<MtStaffMapper, MtStaff> implem
             userInfo.setStoreId(mtStaff.getStoreId());
             userInfo.setMerchantId(mtStaff.getMerchantId());
             userInfo.setIsStaff(YesOrNoEnum.YES.getKey());
-            userInfo.setOperator(operator);
+            userInfo.setOperator(accountInfo.getAccountName());
             mtUser = memberService.addMember(userInfo, "0");
             if (mtUser != null) {
                 mtStaff.setUserId(mtUser.getId());
@@ -187,13 +193,16 @@ public class StaffServiceImpl extends ServiceImpl<MtStaffMapper, MtStaff> implem
             }
         } else {
             mtUser.setIsStaff(YesOrNoEnum.YES.getKey());
-            mtUser.setOperator(operator);
+            if (mtStaff.getAuditedStatus().equals(StatusEnum.ENABLED.getKey())) {
+                mtUser.setMobile(mtStaff.getMobile());
+            }
+            mtUser.setOperator(accountInfo.getAccountName());
             memberService.updateMember(mtUser, false);
         }
 
         // 更新员工
         this.updateById(mtStaff);
-        logger.info("{}保存员工信息：{}", operator, mtStaff.toString());
+        logger.info("operator：{} 保存员工信息mtStaff：{}", accountInfo.getAccountName(), mtStaff);
         return mtStaff;
     }
 
@@ -201,7 +210,6 @@ public class StaffServiceImpl extends ServiceImpl<MtStaffMapper, MtStaff> implem
      * 根据ID获取员工信息
      *
      * @param  id 员工ID
-     * @throws BusinessCheckException
      * @return
      */
     @Override
@@ -217,14 +225,16 @@ public class StaffServiceImpl extends ServiceImpl<MtStaffMapper, MtStaff> implem
      *
      * @param  staffId 员工ID
      * @param status 状态
-     * @param operator 操作人
-     * @throws BusinessCheckException
+     * @param accountInfo 操作人
      * @return
      */
     @Override
     @OperationServiceLog(description = "修改店铺员工状态")
-    public Integer updateAuditedStatus(Integer staffId, String status, String operator) throws BusinessCheckException {
+    public Integer updateAuditedStatus(Integer staffId, String status, AccountInfo accountInfo) throws BusinessCheckException {
         MtStaff mtStaff = mtStaffMapper.selectById(staffId);
+        if (!mtStaff.getMerchantId().equals(accountInfo.getMerchantId())) {
+            throw new BusinessCheckException("没有操作权限");
+        }
         if (mtStaff != null) {
             mtStaff.setAuditedStatus(status);
             mtStaff.setUpdateTime(new Date());
@@ -273,7 +283,6 @@ public class StaffServiceImpl extends ServiceImpl<MtStaffMapper, MtStaff> implem
      * 根据手机号获取员工信息
      *
      * @param mobile 手机号
-     * @throws BusinessCheckException
      * @return
      */
     @Override
@@ -288,7 +297,6 @@ public class StaffServiceImpl extends ServiceImpl<MtStaffMapper, MtStaff> implem
      * 根据会员ID获取员工信息
      *
      * @param  userId 会员ID
-     * @throws BusinessCheckException
      * @return
      */
     @Override
@@ -300,11 +308,10 @@ public class StaffServiceImpl extends ServiceImpl<MtStaffMapper, MtStaff> implem
      * 根据手机号获取员工信息
      *
      * @param mobile 手机号
-     * @throws BusinessCheckException
      * @return
      */
     @Override
-    public StaffDto getStaffInfoByMobile(String mobile) throws BusinessCheckException {
+    public StaffDto getStaffInfoByMobile(String mobile) {
         MtStaff mtStaff =  mtStaffMapper.queryStaffByMobile(mobile);
         StaffDto staffDto = new StaffDto();
         if (mtStaff != null) {

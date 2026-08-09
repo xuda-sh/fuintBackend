@@ -1,7 +1,7 @@
 package com.fuint.module.clientApi.controller;
 
-import com.fuint.common.dto.RegionDto;
-import com.fuint.common.dto.UserInfo;
+import com.fuint.common.dto.common.RegionDto;
+import com.fuint.common.dto.member.UserInfo;
 import com.fuint.common.util.TokenUtil;
 import com.fuint.framework.web.BaseController;
 import com.fuint.framework.web.ResponseObject;
@@ -10,8 +10,11 @@ import com.fuint.repository.model.MtRegion;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
-import org.springframework.web.bind.annotation.*;
-import javax.servlet.http.HttpServletRequest;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RestController;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -37,8 +40,8 @@ public class ClientRegionController extends BaseController {
     @ApiOperation(value = "获取地区树状结构")
     @RequestMapping(value = "/tree", method = RequestMethod.GET)
     @CrossOrigin
-    public ResponseObject tree(HttpServletRequest request) {
-        UserInfo userInfo = TokenUtil.getUserInfoByToken(request.getHeader("Access-Token"));
+    public ResponseObject tree() {
+        UserInfo userInfo = TokenUtil.getUserInfo();
         if (userInfo == null) {
             return getFailureResult(1001, "用户未登录");
         }

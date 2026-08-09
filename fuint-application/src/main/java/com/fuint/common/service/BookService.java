@@ -1,15 +1,16 @@
 package com.fuint.common.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.fuint.common.dto.BookDto;
+import com.fuint.common.dto.book.BookDto;
+import com.fuint.common.dto.system.AccountInfo;
+import com.fuint.common.param.BookPage;
 import com.fuint.common.param.BookableParam;
-import com.fuint.framework.pagination.PaginationRequest;
-import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.framework.exception.BusinessCheckException;
+import com.fuint.framework.pagination.PaginationResponse;
 import com.fuint.repository.model.MtBook;
+
 import java.text.ParseException;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 预约业务接口
@@ -22,55 +23,56 @@ public interface BookService extends IService<MtBook> {
     /**
      * 分页查询预约列表
      *
-     * @param paginationRequest
+     * @param bookPage
      * @return
      */
-    PaginationResponse<BookDto> queryBookListByPagination(PaginationRequest paginationRequest) throws BusinessCheckException;
+    PaginationResponse<BookDto> queryBookListByPagination(BookPage bookPage);
 
     /**
      * 添加预约
      *
-     * @param  mtBook
+     * @param  bookDto
      * @throws BusinessCheckException
      * @return
      */
-    MtBook addBook(MtBook mtBook) throws BusinessCheckException;
+    MtBook addBook(BookDto bookDto) throws BusinessCheckException;
 
     /**
      * 根据ID获取预约项目信息
      *
      * @param  id 预约项目ID
      * @param fillDate 填充日期
-     * @throws BusinessCheckException
+     * @throws ParseException
      * @return
      */
-    BookDto getBookById(Integer id, boolean fillDate) throws BusinessCheckException, ParseException;
+    BookDto getBookById(Integer id, boolean fillDate) throws ParseException;
 
     /**
      * 更新预约项目
      *
-     * @param  mtBook
+     * @param  bookDto
+     * @param  accountInfo 操作人信息
      * @throws BusinessCheckException
      * @return
      * */
-    MtBook updateBook(MtBook mtBook) throws BusinessCheckException;
+    MtBook updateBook(BookDto bookDto, AccountInfo accountInfo) throws BusinessCheckException;
 
     /**
      * 是否可预约
      *
      * @param  param
-     * @throws BusinessCheckException
+     * @throws BusinessCheckException,ParseException
      * @return
      * */
     List<String> isBookable(BookableParam param) throws BusinessCheckException, ParseException;
 
     /**
-     * 根据条件搜索预约项目
+     * 获取预约项目列表
      *
-     * @param  params 查询参数
-     * @throws BusinessCheckException
+     * @param  merchantId 商户ID
+     * @param  storeId 店铺ID
      * @return
      * */
-    List<MtBook> queryBookListByParams(Map<String, Object> params) throws BusinessCheckException;
+    List<MtBook> getBookList(Integer merchantId, Integer storeId);
 
 }
