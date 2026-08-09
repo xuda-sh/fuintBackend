@@ -39,10 +39,8 @@ public class WebConfig implements WebMvcConfigurer {
                 .resourceChain(false)
                 .addResolver(new VersionResourceResolver().addContentVersionStrategy("/**"))
                 .addTransformer(new CssLinkResourceTransformer());
-        registry.addResourceHandler("/static/**").addResourceLocations("classpath:/static/");
-
-        registry.addResourceHandler("/**").addResourceLocations(
-                "classpath:/static/");
+        registry.addResourceHandler("/static/**").addResourceLocations("classpath:/statics/");
+        registry.addResourceHandler("/**").addResourceLocations("classpath:/statics/");
     }
 
     @Bean
