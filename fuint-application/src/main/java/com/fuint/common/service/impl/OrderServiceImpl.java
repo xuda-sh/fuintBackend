@@ -40,6 +40,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import weixin.popular.util.JsonUtil;
 
 import javax.servlet.http.HttpServletRequest;
@@ -481,10 +483,10 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
             mtOrder.setCreateTime(new Date());
         }
 
-        // 计算商品订单总金额
+        // 计算商品订单总金额（积分兑换订单同样需要取商品/购物车数据）
         List<MtCart> cartList = new ArrayList<>();
         Map<String, Object> cartData = new HashMap<>();
-        if (orderDto.getType().equals(OrderTypeEnum.GOODS.getKey())) {
+        if (orderDto.getType().equals(OrderTypeEnum.GOODS.getKey()) || orderDto.getType().equals(OrderTypeEnum.EXCHANGE.getKey())) {
             if (StringUtil.isNotEmpty(orderDto.getCartIds())) {
                 Map<String, Object> param = new HashMap<>();
                 param.put("status", StatusEnum.ENABLED.getKey());
@@ -612,7 +614,7 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
                     }
                     if (userCouponInfo != null && userCouponInfo.getBalance().compareTo(BigDecimal.ZERO) > 0) {
                         BigDecimal deductAmount = remainingDiscount.min(userCouponInfo.getBalance());
-                        String useCode = couponService.useCoupon(cid, mtOrder.getUserId(), mtOrder.getStoreId(), mtOrder.getId(), deductAmount, "购物使用卡券");
+                        String useCode = couponService.useCoupon(cid, mtOrder.getUserId(), mtOrder.getStoreId(), mtOrder.getId(), deductAmount, "购物使用卡券", orderDto.getOperator());
                         if (StringUtil.isNotEmpty(useCode)) {
                             totalDeducted = totalDeducted.add(deductAmount);
                             remainingDiscount = remainingDiscount.subtract(deductAmount);
@@ -671,8 +673,8 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
             }
         }
 
-        // 如果是商品订单，生成订单商品
-        if (orderDto.getType().equals(OrderTypeEnum.GOODS.getKey()) && cartList.size() > 0) {
+        // 如果是商品订单或积分兑换订单，生成订单商品
+        if ((orderDto.getType().equals(OrderTypeEnum.GOODS.getKey()) || orderDto.getType().equals(OrderTypeEnum.EXCHANGE.getKey())) && cartList.size() > 0) {
             Object listObject = cartData.get("list");
             List<ResCartDto> lists =(ArrayList<ResCartDto>)listObject;
             BigDecimal memberDiscount = new BigDecimal("0");
@@ -813,6 +815,41 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
         }
 
         return orderInfo;
+    }
+
+    /**
+     * 统计会员已兑换某商品的数量（积分兑换订单，排除已取消订单）
+     *
+     * @param userId 会员ID
+     * @param goodsId 商品ID
+     * @return 已兑换数量
+     */
+    private int queryExchangeNum(Integer userId, Integer goodsId) {
+        if (userId == null || goodsId == null) {
+            return 0;
+        }
+        LambdaQueryWrapper<MtOrder> orderWrapper = Wrappers.lambdaQuery();
+        orderWrapper.eq(MtOrder::getUserId, userId);
+        orderWrapper.eq(MtOrder::getType, OrderTypeEnum.EXCHANGE.getKey());
+        orderWrapper.ne(MtOrder::getStatus, OrderStatusEnum.CANCEL.getKey());
+        List<MtOrder> orderList = mtOrderMapper.selectList(orderWrapper);
+        if (orderList == null || orderList.size() == 0) {
+            return 0;
+        }
+        double total = 0;
+        for (MtOrder mtOrder : orderList) {
+            Map<String, Object> params = new HashMap<>();
+            params.put("order_id", mtOrder.getId());
+            List<MtOrderGoods> goodsList = mtOrderGoodsMapper.selectByMap(params);
+            if (goodsList != null) {
+                for (MtOrderGoods orderGoods : goodsList) {
+                    if (orderGoods.getGoodsId() != null && orderGoods.getGoodsId().equals(goodsId) && orderGoods.getNum() != null) {
+                        total = total + orderGoods.getNum();
+                    }
+                }
+            }
+        }
+        return (int) Math.round(total);
     }
 
     /**
@@ -981,6 +1018,37 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
         orderDto.setAmount(new BigDecimal("0"));
         orderDto.setCartIds(cartIds);
 
+        // 积分兑换订单：后端按商品重算所需积分（防止前端篡改），并校验库存、积分余额与限购
+        boolean isPointExchange = PayTypeEnum.POINT.getKey().equals(payType) || OrderTypeEnum.EXCHANGE.getKey().equals(type);
+        if (isPointExchange) {
+            MtGoods exchangeGoods = goodsService.queryGoodsById(goodsId);
+            if (exchangeGoods == null || !YesOrNoEnum.YES.getKey().equals(exchangeGoods.getIsPointGoods())) {
+                throw new BusinessCheckException("该商品不支持积分兑换");
+            }
+            Integer pointPrice = exchangeGoods.getPointPrice() == null ? 0 : exchangeGoods.getPointPrice();
+            if (pointPrice <= 0) {
+                throw new BusinessCheckException("该商品未设置兑换所需积分");
+            }
+            double num = buyNum == null || buyNum <= 0 ? 1 : buyNum;
+            if (exchangeGoods.getStock() != null && exchangeGoods.getStock() < num) {
+                throw new BusinessCheckException("库存不足，无法兑换");
+            }
+            usePoint = new BigDecimal(pointPrice).multiply(new BigDecimal(num)).intValue();
+            Integer limit = exchangeGoods.getExchangeLimit() == null ? 0 : exchangeGoods.getExchangeLimit();
+            if (limit > 0 && userInfo != null && userInfo.getId() != null) {
+                int exchangedNum = queryExchangeNum(userInfo.getId(), goodsId);
+                if ((exchangedNum + num) > limit) {
+                    throw new BusinessCheckException("该商品每人限兑" + limit + "件，你已兑换" + exchangedNum + "件");
+                }
+            }
+            if (userInfo == null || userInfo.getPoint() == null || userInfo.getPoint() < usePoint) {
+                throw new BusinessCheckException("积分不足，兑换该商品需要" + usePoint + "积分");
+            }
+            orderDto.setType(OrderTypeEnum.EXCHANGE.getKey());
+            orderDto.setPayType(PayTypeEnum.POINT.getKey());
+            orderDto.setUsePoint(usePoint);
+        }
+
         // 储值卡的订单
         if (orderDto.getType().equals(OrderTypeEnum.PRESTORE.getKey())) {
             orderDto.setCouponId(targetId);
@@ -1005,6 +1073,9 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
 
             orderDto.setParam(orderParam);
             orderDto.setAmount(totalAmount);
+            // 预存订单应付金额 = 预存本金合计，必须写入 payAmount，
+            // 否则订单 payAmount 为 0，会被判定为"无需支付"直接置为已支付
+            orderDto.setPayAmount(totalAmount);
             payAmount = totalAmount.toString();
         }
 
@@ -1024,6 +1095,7 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
             if (userGrade != null) {
                 orderDto.setRemark("付费升级" + userGrade.getName());
                 orderDto.setAmount(new BigDecimal(userGrade.getCatchValue().toString()));
+                orderDto.setPayAmount(orderDto.getAmount());
             }
         }
 
@@ -1032,8 +1104,8 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
             orderDto.setCouponId(couponId);
         }
 
-        // 商品订单且配送要加上配送费用
-        if (orderDto.getType().equals(OrderTypeEnum.GOODS.getKey()) && orderDto.getOrderMode().equals(OrderModeEnum.EXPRESS.getKey())) {
+        // 商品订单且配送要加上配送费用（积分兑换订单选择物流配送时同样计费）
+        if ((orderDto.getType().equals(OrderTypeEnum.GOODS.getKey()) || orderDto.getType().equals(OrderTypeEnum.EXCHANGE.getKey())) && orderDto.getOrderMode().equals(OrderModeEnum.EXPRESS.getKey())) {
             MtSetting mtSetting = settingService.querySettingByName(merchantId, SettingTypeEnum.ORDER.getKey(), OrderSettingEnum.DELIVERY_FEE.getKey());
             if (mtSetting != null && StringUtil.isNotEmpty(mtSetting.getValue())) {
                 BigDecimal deliveryFee = new BigDecimal(mtSetting.getValue());
@@ -1130,7 +1202,7 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
                                     }
                                 }
                                 if (canUse) {
-                                    String useCode = couponService.useCoupon(cid, orderDto.getUserId(), orderDto.getStoreId(), orderInfo.getId(), userCouponInfo.getAmount(), "核销");
+                                    String useCode = couponService.useCoupon(cid, orderDto.getUserId(), orderDto.getStoreId(), orderInfo.getId(), userCouponInfo.getAmount(), "核销", operator);
                                     if (StringUtil.isNotEmpty(useCode)) {
                                         hasProcessed = true;
                                         orderDto.setCouponId(cid);
@@ -1149,7 +1221,7 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
                                 // 储值卡：依次扣减，支持叠加
                                 BigDecimal deductAmount = remainPayAmount.min(userCouponInfo.getBalance());
                                 try {
-                                    String useCode = couponService.useCoupon(cid, orderDto.getUserId(), orderDto.getStoreId(), orderInfo.getId(), deductAmount, "核销");
+                                    String useCode = couponService.useCoupon(cid, orderDto.getUserId(), orderDto.getStoreId(), orderInfo.getId(), deductAmount, "核销", operator);
                                     if (StringUtil.isNotEmpty(useCode)) {
                                         hasProcessed = true;
                                         if (totalCouponDiscount.compareTo(BigDecimal.ZERO) == 0) {
@@ -1205,7 +1277,8 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
         }
 
         MtSetting delivery = settingService.querySettingByName(merchantId, SettingTypeEnum.ORDER.getKey(),OrderSettingEnum.DELIVERY_MIN_AMOUNT.getKey());
-        if (delivery != null && orderInfo.getOrderMode().equals(OrderModeEnum.EXPRESS.getKey())) {
+        // 积分兑换订单商品金额为0，不校验起送金额
+        if (delivery != null && orderInfo.getOrderMode().equals(OrderModeEnum.EXPRESS.getKey()) && !OrderTypeEnum.EXCHANGE.getKey().equals(orderInfo.getType())) {
             BigDecimal deliveryMinAmount = new BigDecimal(delivery.getValue());
             if (deliveryMinAmount.compareTo(new BigDecimal("0")) > 0 && deliveryMinAmount.compareTo(orderInfo.getAmount()) > 0) {
                 throw new BusinessCheckException("订单起送金额：" + deliveryMinAmount + "元");
@@ -1584,12 +1657,17 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
     /**
      * 更新订单
      *
-     * @param mtOrder 订单信息
+     * @param  mtOrder 订单信息
+     * @throws BusinessCheckException
      * @return
      * */
     @Override
+    @OperationServiceLog(description = "修改订单信息")
     @Transactional(rollbackFor = Exception.class)
-    public MtOrder updateOrder(MtOrder mtOrder) {
+    public MtOrder updateOrder(MtOrder mtOrder) throws BusinessCheckException {
+        if (mtOrder.getId() == null || mtOrder.getId() <= 0) {
+            throw new BusinessCheckException("订单ID无效，更新订单失败.");
+        }
         mtOrder.setUpdateTime(new Date());
         Integer id = mtOrderMapper.updateById(mtOrder);
         if (id > 0) {
@@ -1755,6 +1833,30 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
             }
         }
 
+        // 打印订单与短信通知涉及外部 HTTP 调用，放到事务提交之后执行。
+        // 否则外部调用会把事务拉长，长时间占用 mt_user 行锁，导致其它请求 Lock wait timeout
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    printOrderAndSendSms(orderInfo, mtOrder);
+                }
+            });
+        } else {
+            printOrderAndSendSms(orderInfo, mtOrder);
+        }
+
+        return true;
+    }
+
+    /**
+     * 打印订单并给商家发送通知短信
+     * 说明：包含外部 HTTP 调用，必须在事务提交之后执行，避免长事务占用行锁
+     *
+     * @param orderInfo 订单信息
+     * @param mtOrder 订单实体
+     */
+    private void printOrderAndSendSms(UserOrderDto orderInfo, MtOrder mtOrder) {
         try {
             // 打印订单
             printerService.printOrder(orderInfo, true);
@@ -1771,8 +1873,6 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
         } catch (Exception e) {
             logger.info("打印订单或给商家发送短信出错啦，message = {}", e.getMessage());
         }
-
-        return true;
     }
 
     /**
@@ -1809,7 +1909,7 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
         userOrderDto.setOrderMode(orderInfo.getOrderMode());
         userOrderDto.setCreateTime(DateUtil.formatDate(orderInfo.getCreateTime(), "yyyy.MM.dd HH:mm"));
         userOrderDto.setUpdateTime(DateUtil.formatDate(orderInfo.getUpdateTime(), "yyyy.MM.dd HH:mm"));
-        userOrderDto.setAmount(orderInfo.getAmount());
+        userOrderDto.setAmount(orderInfo.getAmount() == null ? new BigDecimal("0") : orderInfo.getAmount());
         userOrderDto.setIsVisitor(orderInfo.getIsVisitor());
         userOrderDto.setStaffId(orderInfo.getStaffId());
         userOrderDto.setVerifyCode("");
@@ -1821,7 +1921,7 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
             userOrderDto.setConfirmTime(DateUtil.formatDate(orderInfo.getConfirmTime(), "yyyy.MM.dd HH:mm"));
         }
 
-        if (orderInfo.getType().equals(OrderTypeEnum.GOODS.getKey()) && orderInfo.getPayStatus().equals(PayStatusEnum.SUCCESS.getKey()) && orderInfo.getConfirmStatus().equals(YesOrNoEnum.NO.getKey())) {
+        if ((orderInfo.getType().equals(OrderTypeEnum.GOODS.getKey()) || orderInfo.getType().equals(OrderTypeEnum.EXCHANGE.getKey())) && orderInfo.getPayStatus().equals(PayStatusEnum.SUCCESS.getKey()) && orderInfo.getConfirmStatus().equals(YesOrNoEnum.NO.getKey())) {
             userOrderDto.setIsVerify(false);
         } else {
             userOrderDto.setIsVerify(true);
@@ -1914,8 +2014,8 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
             }
         }
 
-        // 商品订单
-        if (orderInfo.getType().equals(OrderTypeEnum.GOODS.getKey())) {
+        // 商品订单（积分兑换订单同样需要返回商品明细）
+        if (orderInfo.getType().equals(OrderTypeEnum.GOODS.getKey()) || orderInfo.getType().equals(OrderTypeEnum.EXCHANGE.getKey())) {
             Map<String, Object> params = new HashMap<>();
             params.put("ORDER_ID", orderInfo.getId());
             List<MtOrderGoods> orderGoodsList = mtOrderGoodsMapper.selectByMap(params);
@@ -2202,6 +2302,9 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
         Double totalNum = 0.0;
         BigDecimal totalPrice = new BigDecimal("0");
         BigDecimal totalCanUsePointAmount = new BigDecimal("0");
+        // 积分兑换商品：累计兑换所需积分、购物车是否含积分商品
+        Integer totalExchangePoint = 0;
+        Boolean hasPointGoods = false;
         BigDecimal memberDiscount = new BigDecimal("0");
         BigDecimal percent = new BigDecimal("0");
         Integer storeId = 0;
@@ -2276,11 +2379,17 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
                     isEffect = false;
                 }
                 cartDto.setIsEffect(isEffect);
-                // 计算总价
-                totalPrice = totalPrice.add(cartDto.getGoodsInfo().getPrice().multiply(new BigDecimal(cart.getNum())));
-                // 累加可用积分去抵扣的金额
-                if (mtGoodsInfo.getCanUsePoint() != null && mtGoodsInfo.getCanUsePoint().equals(YesOrNoEnum.YES.getKey())) {
-                    totalCanUsePointAmount = totalCanUsePointAmount.add(cartDto.getGoodsInfo().getPrice().multiply(new BigDecimal(cart.getNum())));
+                // 计算总价：积分兑换商品只累计所需积分，不参与现金金额计算
+                if (YesOrNoEnum.YES.getKey().equals(mtGoodsInfo.getIsPointGoods())) {
+                    hasPointGoods = true;
+                    Integer pointPrice = mtGoodsInfo.getPointPrice() == null ? 0 : mtGoodsInfo.getPointPrice();
+                    totalExchangePoint = totalExchangePoint + new BigDecimal(pointPrice).multiply(new BigDecimal(cart.getNum())).intValue();
+                } else {
+                    totalPrice = totalPrice.add(cartDto.getGoodsInfo().getPrice().multiply(new BigDecimal(cart.getNum())));
+                    // 累加可用积分去抵扣的金额
+                    if (mtGoodsInfo.getCanUsePoint() != null && mtGoodsInfo.getCanUsePoint().equals(YesOrNoEnum.YES.getKey())) {
+                        totalCanUsePointAmount = totalCanUsePointAmount.add(cartDto.getGoodsInfo().getPrice().multiply(new BigDecimal(cart.getNum())));
+                    }
                 }
                 cartDtoList.add(cartDto);
             }
@@ -2453,28 +2562,33 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
         Integer myPoint = userInfo.getPoint() == null ? 0 : userInfo.getPoint();
         Integer usePoint = 0;
         BigDecimal usePointAmount = new BigDecimal("0");
-        MtSetting setting = settingService.querySettingByName(merchantId, SettingTypeEnum.POINT.getKey(), PointSettingEnum.EXCHANGE_NEED_POINT.getKey());
-        if (myPoint > 0 && setting != null && isUsePoint) {
-            if (StringUtil.isNotEmpty(setting.getValue()) && !setting.getValue().equals("0")) {
-                BigDecimal usePoints = new BigDecimal(myPoint);
-                usePointAmount = usePoints.divide(new BigDecimal(setting.getValue()), BigDecimal.ROUND_CEILING, 4);
-                usePoint = myPoint;
-                if (usePointAmount.compareTo(totalCanUsePointAmount) >= 0) {
-                    usePointAmount = totalCanUsePointAmount;
-                    usePoint = totalCanUsePointAmount.multiply(new BigDecimal(setting.getValue())).intValue();
+        if (hasPointGoods) {
+            // 积分兑换商品：本单直接消耗 totalExchangePoint 积分，不做"积分抵现金"换算
+            usePoint = totalExchangePoint;
+        } else {
+            MtSetting setting = settingService.querySettingByName(merchantId, SettingTypeEnum.POINT.getKey(), PointSettingEnum.EXCHANGE_NEED_POINT.getKey());
+            if (myPoint > 0 && setting != null && isUsePoint) {
+                if (StringUtil.isNotEmpty(setting.getValue()) && !setting.getValue().equals("0")) {
+                    BigDecimal usePoints = new BigDecimal(myPoint);
+                    usePointAmount = usePoints.divide(new BigDecimal(setting.getValue()), BigDecimal.ROUND_CEILING, 4);
+                    usePoint = myPoint;
+                    if (usePointAmount.compareTo(totalCanUsePointAmount) >= 0) {
+                        usePointAmount = totalCanUsePointAmount;
+                        usePoint = totalCanUsePointAmount.multiply(new BigDecimal(setting.getValue())).intValue();
+                    }
                 }
             }
-        }
 
-        // 积分金额不能大于支付金额
-        if (usePointAmount.compareTo(payPrice) > 0 && isUsePoint) {
-            usePointAmount = payPrice;
-            BigDecimal usePoints = payPrice.multiply(new BigDecimal(setting.getValue()));
-            usePoint = usePoints.intValue();
-        }
+            // 积分金额不能大于支付金额
+            if (usePointAmount.compareTo(payPrice) > 0 && isUsePoint) {
+                usePointAmount = payPrice;
+                BigDecimal usePoints = payPrice.multiply(new BigDecimal(setting.getValue()));
+                usePoint = usePoints.intValue();
+            }
 
-        // 支付金额 = 商品总额 - 积分抵扣金额
-        payPrice = payPrice.subtract(usePointAmount);
+            // 支付金额 = 商品总额 - 积分抵扣金额
+            payPrice = payPrice.subtract(usePointAmount);
+        }
 
         // 配送费用
         BigDecimal deliveryFee = new BigDecimal("0");
@@ -2508,6 +2622,8 @@ public class OrderServiceImpl extends ServiceImpl<MtOrderMapper, MtOrder> implem
         }
         result.put("usePoint", usePoint);
         result.put("myPoint", myPoint);
+        result.put("exchangePoint", totalExchangePoint);
+        result.put("hasPointGoods", hasPointGoods);
         result.put("couponAmount", couponAmount);
         result.put("usePointAmount", usePointAmount);
         result.put("deliveryFee", deliveryFee);

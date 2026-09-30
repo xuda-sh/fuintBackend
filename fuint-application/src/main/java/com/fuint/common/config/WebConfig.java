@@ -39,6 +39,10 @@ public class WebConfig implements WebMvcConfigurer {
                 .resourceChain(false)
                 .addResolver(new VersionResourceResolver().addContentVersionStrategy("/**"))
                 .addTransformer(new CssLinkResourceTransformer());
+        registry.addResourceHandler("/static/**").addResourceLocations("classpath:/static/");
+
+        registry.addResourceHandler("/**").addResourceLocations(
+                "classpath:/static/");
         registry.addResourceHandler("/static/**").addResourceLocations("classpath:/statics/");
         registry.addResourceHandler("/**").addResourceLocations("classpath:/statics/");
     }
@@ -81,6 +85,9 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/clientApi/**")
                 .excludePathPatterns("/clientApi/sign/**")
                 .excludePathPatterns("/clientApi/page/home")
+                .excludePathPatterns("/clientApi/theme/**")
+                .excludePathPatterns("/clientApi/tabbar/**")
+                .excludePathPatterns("/clientApi/userPage/**")
                 .excludePathPatterns("/clientApi/captcha/**")
                 .excludePathPatterns("/clientApi/goodsApi/**")
                 .excludePathPatterns("/clientApi/coupon/list")
@@ -95,6 +102,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .excludePathPatterns("/clientApi/pay/aliPayCallback")
                 .excludePathPatterns("/clientApi/order/todoCounts")
                 .excludePathPatterns("/clientApi/order/detail")
+                .excludePathPatterns("/clientApi/order/list")
                 .excludePathPatterns("/clientApi/store/**")
                 .excludePathPatterns("/clientApi/article/**")
                 .excludePathPatterns("/clientApi/message/getOne")

@@ -8,6 +8,7 @@ import com.fuint.common.enums.CouponTypeEnum;
 import com.fuint.common.service.ConfirmLogService;
 import com.fuint.common.service.CouponService;
 import com.fuint.common.service.MemberService;
+import com.fuint.common.service.StaffService;
 import com.fuint.common.util.DateUtil;
 import com.fuint.common.util.TokenUtil;
 import com.fuint.framework.exception.BusinessCheckException;
@@ -15,6 +16,7 @@ import com.fuint.framework.web.BaseController;
 import com.fuint.framework.web.ResponseObject;
 import com.fuint.repository.mapper.MtUserCouponMapper;
 import com.fuint.repository.model.MtCoupon;
+import com.fuint.repository.model.MtStaff;
 import com.fuint.repository.model.MtUser;
 import com.fuint.repository.model.MtUserCoupon;
 import com.fuint.utils.StringUtil;
@@ -57,6 +59,11 @@ public class BackendDoConfirmController extends BaseController {
      * 核销记录服务接口
      * */
     private ConfirmLogService confirmLogService;
+
+    /**
+     * 店铺员工服务接口
+     * */
+    private StaffService staffService;
 
     /**
      * 核销详情
@@ -140,14 +147,17 @@ public class BackendDoConfirmController extends BaseController {
         }
         Integer storeId = accountInfo.getStoreId() == null ? 0 : accountInfo.getStoreId();
         MtUserCoupon mtUserCoupon = mtUserCouponMapper.selectById(Integer.parseInt(userCouponId));
-        if (mtUserCoupon.getType().equals(CouponTypeEnum.PRESTORE.getKey()) && StringUtil.isEmpty(amount)) {
-            return getFailureResult(201, "储值卡核销金额不能为空");
-        }
-        if (!mtUserCoupon.getMerchantId().equals(accountInfo.getMerchantId())) {
+        if (mtUserCoupon == null || !mtUserCoupon.getMerchantId().equals(accountInfo.getMerchantId())) {
             return getFailureResult(1004);
         }
-
-        couponService.useCoupon(Integer.parseInt(userCouponId), accountInfo.getId(), storeId, 0, new BigDecimal(amount), remark);
+        Integer userId = 0;
+        if (accountInfo.getStaffId() != null && accountInfo.getStaffId() > 0) {
+            MtStaff staff = staffService.queryStaffById(accountInfo.getStaffId());
+            if (staff != null) {
+                userId = staff.getUserId();
+            }
+        }
+        couponService.useCoupon(Integer.parseInt(userCouponId), userId, storeId, 0, new BigDecimal(amount), remark, accountInfo.getAccountName());
         return getSuccessResult(true);
     }
 }

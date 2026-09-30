@@ -146,6 +146,15 @@ public class GoodsServiceImpl extends ServiceImpl<MtGoodsMapper, MtGoods> implem
                 lambdaQueryWrapper.gt(MtGoods::getPrice, 0);
             }
         }
+        // 积分商品过滤：Y 只查积分兑换商品，N 只查非积分商品，空代表不过滤（后台需要查看全部商品）
+        String pointGoods = param.getPointGoods();
+        if (StringUtils.isNotBlank(pointGoods)) {
+            if (pointGoods.equals(YesOrNoEnum.YES.getKey())) {
+                lambdaQueryWrapper.eq(MtGoods::getIsPointGoods, YesOrNoEnum.YES.getKey());
+            } else if (pointGoods.equals(YesOrNoEnum.NO.getKey())) {
+                lambdaQueryWrapper.and(qw -> qw.ne(MtGoods::getIsPointGoods, YesOrNoEnum.YES.getKey()).or().isNull(MtGoods::getIsPointGoods));
+            }
+        }
         String platform = param.getPlatform();
         if (StringUtils.isNotBlank(platform)) {
             if (platform.equals(PlatformTypeEnum.H5.getCode()) || platform.equals(PlatformTypeEnum.MP_WEIXIN.getCode())) {
@@ -208,7 +217,10 @@ public class GoodsServiceImpl extends ServiceImpl<MtGoodsMapper, MtGoods> implem
                 MtGoods::getStock,
                 MtGoods::getType,
                 MtGoods::getOperator,
-                MtGoods::getWeight);
+                MtGoods::getWeight,
+                MtGoods::getIsPointGoods,
+                MtGoods::getPointPrice,
+                MtGoods::getExchangeLimit);
         Page<MtGoods> pageHelper = PageHelper.startPage(param.getPage(), param.getPageSize());
         List<MtGoods> goodsList = mtGoodsMapper.selectList(lambdaQueryWrapper);
         List<GoodsDto> dataList = new ArrayList<>();
@@ -221,6 +233,9 @@ public class GoodsServiceImpl extends ServiceImpl<MtGoodsMapper, MtGoods> implem
              GoodsDto item = new GoodsDto();
              item.setId(mtGoods.getId());
              item.setInitSale(mtGoods.getInitSale());
+             item.setIsPointGoods(mtGoods.getIsPointGoods());
+             item.setPointPrice(mtGoods.getPointPrice());
+             item.setExchangeLimit(mtGoods.getExchangeLimit());
              if (StringUtil.isNotEmpty(mtGoods.getLogo())) {
                  item.setLogo(basePath + mtGoods.getLogo());
              }
@@ -376,6 +391,16 @@ public class GoodsServiceImpl extends ServiceImpl<MtGoodsMapper, MtGoods> implem
         }
         if (StringUtil.isNotEmpty(reqDto.getCanUsePoint())) {
             mtGoods.setCanUsePoint(reqDto.getCanUsePoint());
+        }
+        // 积分兑换商品标记与数值：未提交的字段保持原值，避免被其它 tab 的保存覆盖
+        if (StringUtil.isNotEmpty(reqDto.getIsPointGoods())) {
+            mtGoods.setIsPointGoods(reqDto.getIsPointGoods());
+        }
+        if (reqDto.getPointPrice() != null) {
+            mtGoods.setPointPrice(reqDto.getPointPrice());
+        }
+        if (reqDto.getExchangeLimit() != null) {
+            mtGoods.setExchangeLimit(reqDto.getExchangeLimit());
         }
         if (StringUtil.isNotEmpty(reqDto.getIsMemberDiscount())) {
             mtGoods.setIsMemberDiscount(reqDto.getIsMemberDiscount());
@@ -779,7 +804,15 @@ public class GoodsServiceImpl extends ServiceImpl<MtGoodsMapper, MtGoods> implem
         Page<MtGoods> pageHelper = PageHelper.startPage(page, pageSize);
         List<GoodsDto> dataList = new ArrayList<>();
 
-        List<GoodsBean> goodsList = mtGoodsMapper.selectGoodsList(merchantId, storeId, cateId, keyword);
+        // onlyGoods=true时仅返回商品列表（每个商品一行，不展开SKU），用于页面装修等只选商品的场景
+        String onlyGoods = params.get("onlyGoods") == null ? "" : params.get("onlyGoods").toString();
+        boolean onlyGoodsFlag = "true".equalsIgnoreCase(onlyGoods) || "1".equals(onlyGoods);
+        List<GoodsBean> goodsList;
+        if (onlyGoodsFlag) {
+            goodsList = mtGoodsMapper.selectGoodsListOnly(merchantId, storeId, cateId, keyword);
+        } else {
+            goodsList = mtGoodsMapper.selectGoodsList(merchantId, storeId, cateId, keyword);
+        }
 
         for (GoodsBean goodsBean : goodsList) {
              GoodsDto goodsDto = new GoodsDto();
@@ -791,6 +824,7 @@ public class GoodsServiceImpl extends ServiceImpl<MtGoodsMapper, MtGoods> implem
              goodsDto.setPrice(goodsBean.getPrice());
              goodsDto.setCateId(goodsBean.getCateId());
              goodsDto.setStock(goodsBean.getStock());
+             goodsDto.setInitSale(goodsBean.getInitSale());
              if (goodsBean.getSpecIds() != null) {
                  Map<String, Object> param = new HashMap<>();
                  param.put("GOODS_ID", goodsBean.getGoodsId());
