@@ -579,16 +579,18 @@ public class RefundServiceImpl extends ServiceImpl<MtRefundMapper, MtRefund> imp
         params.put("ORDER_SN", orderInfo.getOrderSn());
         List<MtPoint> pointList = mtPointMapper.selectByMap(params);
         if (pointList != null && pointList.size() > 0) {
-            Integer pointNum = pointList.get(0).getAmount();
-            if (pointNum > 0) {
-                Integer amount = pointNum - (pointNum) * 2;
-                MtPoint mtPoint = new MtPoint();
-                mtPoint.setAmount(amount.intValue());
-                mtPoint.setUserId(orderInfo.getUserId());
-                mtPoint.setOrderSn(orderInfo.getOrderSn());
-                mtPoint.setDescription("退款￥" + orderInfo.getPayAmount() + "退回" + pointNum + "积分");
-                mtPoint.setOperator(refundDto.getOperator() == null ? "系统" : refundDto.getOperator());
-                pointService.addPoint(mtPoint);
+            for (MtPoint point : pointList){
+                Integer pointNum = point.getAmount();
+                if (pointNum > 0 && pointNum.compareTo(orderInfo.getPayAmount().intValue()) == 0) {
+                    Integer amount = pointNum - (pointNum) * 2;
+                    MtPoint mtPoint = new MtPoint();
+                    mtPoint.setAmount(amount.intValue());
+                    mtPoint.setUserId(orderInfo.getUserId());
+                    mtPoint.setOrderSn(orderInfo.getOrderSn());
+                    mtPoint.setDescription("退款￥" + orderInfo.getPayAmount() + "退回" + pointNum + "积分");
+                    mtPoint.setOperator(refundDto.getOperator() == null ? "系统" : refundDto.getOperator());
+                    pointService.addPoint(mtPoint);
+                }
             }
         }
 
